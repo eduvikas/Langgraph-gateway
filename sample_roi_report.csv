@@ -1,0 +1,6 @@
+app,outcome_label,outcomes,spend,cost_per_outcome,baseline_cost_per_outcome
+Support copilot,ticket resolved,74,0.3006,0.00406,0.01572
+Code review assistant,PR reviewed,50,0.242,0.00484,0.02618
+Contract summarizer,contract reviewed,55,2.1814,0.03966,0.05524
+Sales forecast agent,forecast generated,71,2.2454,0.03162,0.05142
+Internal wiki Q&A,question answered,50,0.1497,0.00299,0.01418

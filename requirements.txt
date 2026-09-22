@@ -1,3 +1,5 @@
 langgraph
 langchain-core
 langsmith
+langchain-openai      # for real OpenAI models (set OPENAI_API_KEY to use)
+# langchain-anthropic # uncomment if you'd rather use Claude (set ANTHROPIC_API_KEY instead)

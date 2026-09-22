@@ -16,11 +16,14 @@ import uuid
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, END
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import HumanMessage
 
+from model_backends import make_model, REAL_MODELS_ENABLED
+
 # ---------------------------------------------------------------------------
-# Model backends (mocked — see docstring above for swapping in real models)
+# Model backends — mocked by default, real Claude calls if ANTHROPIC_API_KEY
+# is set (see model_backends.py). Pricing below is illustrative; replace
+# with your negotiated or list pricing per tier.
 # ---------------------------------------------------------------------------
 MODEL_PRICING = {
     "small":    {"price_per_m_tokens": 0.15,  "label": "Self-hosted small (Llama-class)"},
@@ -28,22 +31,19 @@ MODEL_PRICING = {
     "frontier": {"price_per_m_tokens": 15.00, "label": "Frontier API (Opus-class)"},
 }
 
-
-def make_mock_model(tier: str) -> FakeListChatModel:
-    return FakeListChatModel(responses=[f"[{tier} model response]"])
-
-
-MODELS = {tier: make_mock_model(tier) for tier in MODEL_PRICING}
+MODELS = {tier: make_model(tier) for tier in MODEL_PRICING}
 
 # ---------------------------------------------------------------------------
-# App registry — 5 mock applications sharing the gateway
+# App registry — 5 mock applications sharing the gateway. outcome_label is
+# what leadership actually cares about: not "tokens", but "tickets
+# resolved" or "PRs reviewed" — the unit cost-per-outcome is reported in.
 # ---------------------------------------------------------------------------
 APPS = {
-    "support":     {"name": "Support copilot",        "daily_budget": 40.0, "mix": {"simple": 0.75, "medium": 0.22, "complex": 0.03}},
-    "codereview":  {"name": "Code review assistant",  "daily_budget": 35.0, "mix": {"simple": 0.30, "medium": 0.55, "complex": 0.15}},
-    "contracts":   {"name": "Contract summarizer",    "daily_budget": 25.0, "mix": {"simple": 0.10, "medium": 0.35, "complex": 0.55}},
-    "forecast":    {"name": "Sales forecast agent",   "daily_budget": 20.0, "mix": {"simple": 0.15, "medium": 0.35, "complex": 0.50}},
-    "wiki":        {"name": "Internal wiki Q&A",      "daily_budget": 15.0, "mix": {"simple": 0.80, "medium": 0.18, "complex": 0.02}},
+    "support":     {"name": "Support copilot",        "daily_budget": 40.0, "outcome_label": "ticket resolved",     "mix": {"simple": 0.75, "medium": 0.22, "complex": 0.03}},
+    "codereview":  {"name": "Code review assistant",  "daily_budget": 35.0, "outcome_label": "PR reviewed",         "mix": {"simple": 0.30, "medium": 0.55, "complex": 0.15}},
+    "contracts":   {"name": "Contract summarizer",    "daily_budget": 25.0, "outcome_label": "contract reviewed",   "mix": {"simple": 0.10, "medium": 0.35, "complex": 0.55}},
+    "forecast":    {"name": "Sales forecast agent",   "daily_budget": 20.0, "outcome_label": "forecast generated",  "mix": {"simple": 0.15, "medium": 0.35, "complex": 0.50}},
+    "wiki":        {"name": "Internal wiki Q&A",      "daily_budget": 15.0, "outcome_label": "question answered",   "mix": {"simple": 0.80, "medium": 0.18, "complex": 0.02}},
 }
 
 TOKEN_RANGE = {"simple": (300, 800), "medium": (800, 2500), "complex": (2500, 8000)}
@@ -71,6 +71,8 @@ class AIGateway:
     def __init__(self):
         self.cache: dict[str, str] = {}
         self.spend: dict[str, float] = {app_id: 0.0 for app_id in APPS}
+        self.baseline_by_app: dict[str, float] = {app_id: 0.0 for app_id in APPS}
+        self.outcomes: dict[str, int] = {app_id: 0 for app_id in APPS}
         self.total_baseline = 0.0
         self.total_requests = 0
         self.cache_hits = 0
@@ -101,6 +103,7 @@ class AIGateway:
     def compute_baseline(self, state: GatewayState) -> GatewayState:
         baseline = (state["tokens"] / 1_000_000) * MODEL_PRICING["frontier"]["price_per_m_tokens"]
         self.total_baseline += baseline
+        self.baseline_by_app[state["app_id"]] += baseline
         return {**state, "baseline_cost": baseline}
 
     def check_cache(self, state: GatewayState) -> GatewayState:
@@ -120,10 +123,14 @@ class AIGateway:
     def call_model(self, state: GatewayState) -> GatewayState:
         model = MODELS[state["tier"]]
         result = model.invoke([HumanMessage(content=state["prompt"])])
-        cost = (state["tokens"] / 1_000_000) * MODEL_PRICING[state["tier"]]["price_per_m_tokens"]
+        # Real models report actual usage; the mock doesn't, so fall back
+        # to the pre-classified estimate in that case.
+        usage = getattr(result, "usage_metadata", None)
+        tokens = usage["total_tokens"] if usage and usage.get("total_tokens") else state["tokens"]
+        cost = (tokens / 1_000_000) * MODEL_PRICING[state["tier"]]["price_per_m_tokens"]
         self.spend[state["app_id"]] += cost
         self.cache[self._cache_key(state["prompt"])] = result.content
-        return {**state, "cost": cost, "response": result.content}
+        return {**state, "tokens": tokens, "cost": cost, "response": result.content}
 
     def serve_from_cache(self, state: GatewayState) -> GatewayState:
         return {**state, "cost": 0.0, "blocked": False, "response": self.cache[self._cache_key(state["prompt"])]}
@@ -173,15 +180,38 @@ class AIGateway:
             initial["complexity"] = force_complexity
         if force_tokens:
             initial["force_tokens"] = force_tokens
-        return self.graph.invoke(
+        result = self.graph.invoke(
             initial,
             config={"run_name": f"gateway::{APPS[app_id]['name']}", "tags": [app_id, "ai-gateway-demo"]},
         )
+        if not result.get("blocked"):
+            self.outcomes[app_id] += 1
+        return result
+
+    def cost_per_outcome(self) -> list[dict]:
+        """Cost-per-outcome, per app — the number leadership actually acts on.
+        Cost-per-token is a finance-team metric; 'resolving a ticket now costs
+        $X instead of $Y' is legible outside engineering."""
+        rows = []
+        for app_id, app in APPS.items():
+            outcomes = self.outcomes[app_id]
+            spend = self.spend[app_id]
+            baseline = self.baseline_by_app[app_id]
+            rows.append({
+                "app": app["name"],
+                "outcome_label": app["outcome_label"],
+                "outcomes": outcomes,
+                "spend": round(spend, 4),
+                "cost_per_outcome": round(spend / outcomes, 5) if outcomes else 0.0,
+                "baseline_cost_per_outcome": round(baseline / outcomes, 5) if outcomes else 0.0,
+            })
+        return rows
 
     def summary(self) -> str:
         total_spend = sum(self.spend.values())
         savings_pct = (1 - total_spend / self.total_baseline) * 100 if self.total_baseline else 0
-        lines = ["", "=" * 60, "Gateway summary", "=" * 60]
+        backend = "real Claude models (ANTHROPIC_API_KEY detected)" if REAL_MODELS_ENABLED else "mocked models (no API key set)"
+        lines = ["", "=" * 60, f"Gateway summary — backend: {backend}", "=" * 60]
         for app_id, spend in self.spend.items():
             lines.append(f"  {APPS[app_id]['name']:<26} ${spend:>7.4f} / ${APPS[app_id]['daily_budget']:.2f} budget")
         lines += [
