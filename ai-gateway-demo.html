@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI gateway — live cost and routing demo</title>
+<style>
+  :root{
+    --bg:#0B1215; --panel:#121B1F; --panel-2:#17232A; --panel-3:#1D2A31;
+    --border:#243339; --border-strong:#324449;
+    --text:#E4ECEA; --text-dim:#8CA0A6; --text-faint:#5C6F75;
+    --teal:#35C6A6; --teal-dim:#1E4A40;
+    --amber:#E8A33D; --amber-dim:#4A3A1C;
+    --coral:#E8735D; --coral-dim:#4A2A20;
+    --red:#E8433D; --red-dim:#4A1E1C;
+    --mono:'SF Mono', 'IBM Plex Mono', 'Consolas', monospace;
+    --sans:-apple-system, 'Segoe UI', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--sans);
+    padding:28px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto;}
+
+  header{display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin-bottom:14px; flex-wrap:wrap;}
+  h1{font-size:22px; font-weight:500; letter-spacing:-0.01em;}
+  .sub{color:var(--text-dim); font-size:14px; margin-top:4px; max-width:520px;}
+
+  .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  button, .upload-btn{
+    background:var(--panel-2); color:var(--text); border:0.5px solid var(--border-strong);
+    padding:9px 14px; border-radius:8px; font-size:13px; font-family:var(--sans);
+    cursor:pointer; transition:background 0.15s; display:inline-block;
+  }
+  button:hover, .upload-btn:hover{background:var(--panel-3);}
+  button.primary{background:var(--teal-dim); border-color:var(--teal); color:var(--teal);}
+  button.primary:hover{background:#255A4D;}
+  button.warn{background:var(--coral-dim); border-color:var(--coral); color:var(--coral);}
+  button.warn:hover{background:#5A3226;}
+  button:disabled{opacity:0.35; cursor:default;}
+  button.toggle.off{color:var(--text-faint); border-color:var(--border);}
+  button.toggle.active{background:var(--teal-dim); border-color:var(--teal); color:var(--teal);}
+  select{
+    background:var(--panel-2); color:var(--text); border:0.5px solid var(--border-strong);
+    padding:9px 12px; border-radius:8px; font-size:13px; font-family:var(--sans);
+  }
+
+  .controls-row2{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:4px;}
+  .upload-status{font-size:12px; color:var(--text-dim); font-family:var(--mono);}
+  .csv-hint{font-size:11px; color:var(--text-faint); margin-bottom:20px;}
+
+  .stats{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px;}
+  .stat{background:var(--panel); border:0.5px solid var(--border); border-radius:12px; padding:16px;}
+  .stat .label{font-size:12px; color:var(--text-dim);}
+  .stat .value{font-family:var(--mono); font-size:24px; margin-top:6px; font-weight:500;}
+  .stat .delta{font-size:12px; margin-top:4px; color:var(--text-faint);}
+  .stat .delta.good{color:var(--teal);}
+
+  .main-grid{display:grid; grid-template-columns:1fr 340px; gap:16px; margin-bottom:16px;}
+  .panel{background:var(--panel); border:0.5px solid var(--border); border-radius:12px; padding:18px;}
+  .panel h2{font-size:14px; font-weight:500; margin-bottom:14px; color:var(--text);}
+  .panel h2 .hint{color:var(--text-faint); font-weight:400; font-size:12px;}
+
+  .apps{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .app-card{background:var(--panel-2); border:0.5px solid var(--border); border-radius:10px; padding:13px; position:relative;}
+  .app-card.blocked{border-color:var(--red); background:var(--red-dim);}
+  .app-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;}
+  .app-name{font-size:13px; font-weight:500;}
+  .app-team{font-size:11px; color:var(--text-faint);}
+  .app-spend{font-family:var(--mono); font-size:12px; color:var(--text-dim); margin:8px 0 5px;}
+  .budget-bar{height:5px; background:var(--panel-3); border-radius:3px; overflow:hidden;}
+  .budget-fill{height:100%; background:var(--teal); border-radius:3px; transition:width 0.3s;}
+  .budget-fill.amber{background:var(--amber);}
+  .budget-fill.red{background:var(--red);}
+  .app-blocked-tag{font-size:10px; color:var(--red); margin-top:6px; font-family:var(--mono);}
+
+  .feed{display:flex; flex-direction:column; gap:0; max-height:380px; overflow-y:auto;}
+  .feed-row{
+    display:grid; grid-template-columns:1fr auto auto; gap:8px; padding:9px 0;
+    border-bottom:0.5px solid var(--border); font-size:12px; align-items:center;
+  }
+  .feed-row:last-child{border-bottom:none;}
+  .feed-app{color:var(--text); font-size:12px;}
+  .feed-meta{color:var(--text-faint); font-size:11px; margin-top:1px;}
+  .tier-tag{
+    font-family:var(--mono); font-size:10px; padding:3px 7px; border-radius:5px;
+    text-align:center; white-space:nowrap;
+  }
+  .tier-tag.small{background:var(--teal-dim); color:var(--teal);}
+  .tier-tag.mid{background:var(--amber-dim); color:var(--amber);}
+  .tier-tag.frontier{background:var(--coral-dim); color:var(--coral);}
+  .tier-tag.cache{background:var(--panel-3); color:var(--text-dim);}
+  .tier-tag.blocked{background:var(--red-dim); color:var(--red);}
+  .feed-cost{font-family:var(--mono); font-size:12px; text-align:right; color:var(--text-dim); min-width:56px;}
+
+  .charts-grid{display:grid; grid-template-columns:1.4fr 1fr; gap:16px;}
+  .legend{display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+
+  .shadow-row{display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr auto; gap:10px; padding:10px 0; border-bottom:0.5px solid var(--border); align-items:center; font-size:12px;}
+  .shadow-row:last-child{border-bottom:none;}
+  .shadow-path{color:var(--text);}
+  .shadow-cell{color:var(--text-dim); font-family:var(--mono); font-size:12px;}
+
+  footer{margin-top:18px; font-size:12px; color:var(--text-faint); text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>AI gateway — live routing and cost demo</h1>
+      <div class="sub">Five mock applications call one gateway. Every request is classified, routed to the cheapest capable model, checked against cache, and metered against a budget — illustrative pricing and traffic, not production data.</div>
+    </div>
+    <div class="controls">
+      <button id="playBtn" class="primary">Start traffic</button>
+      <select id="speedSelect">
+        <option value="900">1x</option>
+        <option value="350" selected>3x</option>
+        <option value="120">10x</option>
+      </select>
+      <button id="guardrailBtn" class="toggle">Guardrails: on</button>
+      <button id="shadowBtn" class="toggle">Shadow mode: off</button>
+      <button id="runawayBtn" class="warn">Inject runaway agent</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </header>
+
+  <div class="controls-row2">
+    <label class="upload-btn" for="csvInput">Upload usage CSV</label>
+    <input type="file" id="csvInput" accept=".csv" style="display:none">
+    <span id="uploadStatus" class="upload-status"></span>
+    <button id="clearUploadBtn" style="display:none;">Clear upload, return to live demo</button>
+  </div>
+  <div class="csv-hint">Replay real usage instead of simulated traffic. Expected columns (any order, any casing): app, tokens (or input_tokens + output_tokens) — optionally model and cached. Unrecognized columns are ignored.</div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Gateway spend today</div>
+      <div class="value" id="statSpend">$0.00</div>
+      <div class="delta" id="statSpendSub">0 requests</div>
+    </div>
+    <div class="stat">
+      <div class="label">Without a gateway</div>
+      <div class="value" id="statBaseline">$0.00</div>
+      <div class="delta">everything to the frontier model, no cache</div>
+    </div>
+    <div class="stat">
+      <div class="label">Savings</div>
+      <div class="value delta good" id="statSavings">0%</div>
+      <div class="delta" id="statSavingsAbs">$0.00 kept</div>
+    </div>
+    <div class="stat">
+      <div class="label">Cache hit rate</div>
+      <div class="value" id="statCache">0%</div>
+      <div class="delta" id="statCacheAbs">0 of 0 requests</div>
+    </div>
+    <div class="stat">
+      <div class="label">Blocked by budget</div>
+      <div class="value" id="statBlocked">0</div>
+      <div class="delta" id="statBlockedSub">guardrails engaged</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <h2>Applications <span class="hint">— spend against daily budget</span></h2>
+      <div class="apps" id="appsGrid"></div>
+    </div>
+    <div class="panel">
+      <h2>Request feed <span class="hint">— live</span></h2>
+      <div class="feed" id="feed"></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="panel">
+      <h2>Cumulative spend <span class="hint">— gateway vs. no gateway</span></h2>
+      <svg id="lineChart" width="100%" viewBox="0 0 700 220"></svg>
+      <div class="legend">
+        <div class="legend-item"><span class="dot" style="background:var(--teal)"></span>With gateway</div>
+        <div class="legend-item"><span class="dot" style="background:var(--coral)"></span>Without gateway</div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Requests by model tier</h2>
+      <svg id="barChart" width="100%" viewBox="0 0 320 220"></svg>
+      <div class="legend">
+        <div class="legend-item"><span class="dot" style="background:var(--teal)"></span>Self-hosted, small</div>
+        <div class="legend-item"><span class="dot" style="background:var(--amber)"></span>Mid-tier API</div>
+        <div class="legend-item"><span class="dot" style="background:var(--coral)"></span>Frontier API</div>
+        <div class="legend-item"><span class="dot" style="background:var(--text-faint)"></span>Cache hit</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h2>Shadow mode: routing evaluation <span class="hint">— a cheaper model tested in parallel, before it serves real traffic</span></h2>
+    <div id="shadowPanel"></div>
+  </div>
+
+  <footer>All figures are simulated for demonstration. Pricing, traffic volume, and budgets are illustrative placeholders. Quality match scores under shadow mode are simulated too — wire in real eval scores once you're testing against actual outputs.</footer>
+</div>
+
+<script>
+// ---------- configuration ----------
+const MODELS = {
+  small:    { label:'Self-hosted small', price: 0.15, color:'var(--teal)'   },
+  mid:      { label:'Mid-tier API',       price: 3.00, color:'var(--amber)'  },
+  frontier: { label:'Frontier API',       price: 15.00, color:'var(--coral)' }
+};
+const DOWNGRADE = { frontier:'mid', mid:'small' };
+
+const APPS = [
+  { id:'support',  name:'Support copilot',      team:'Customer ops',  budget:40,  weight:5, mix:{simple:0.75, medium:0.22, complex:0.03}, cacheP:0.42 },
+  { id:'codereview',name:'Code review assistant',team:'Engineering',  budget:35,  weight:3, mix:{simple:0.30, medium:0.55, complex:0.15}, cacheP:0.10 },
+  { id:'contracts', name:'Contract summarizer',  team:'Legal',        budget:25,  weight:2, mix:{simple:0.10, medium:0.35, complex:0.55}, cacheP:0.05 },
+  { id:'forecast',  name:'Sales forecast agent', team:'RevOps',       budget:20,  weight:1, mix:{simple:0.15, medium:0.35, complex:0.50}, cacheP:0.08 },
+  { id:'wiki',      name:'Internal wiki Q&A',    team:'People & IT',  budget:15,  weight:4, mix:{simple:0.80, medium:0.18, complex:0.02}, cacheP:0.55 }
+];
+
+const TOKEN_RANGE = { simple:[300,800], medium:[800,2500], complex:[2500,8000] };
+const TIER_BY_COMPLEXITY = { simple:'small', medium:'mid', complex:'frontier' };
+const QUALITY_RANGE = { simple:[0.95,1.0], medium:[0.85,0.97], complex:[0.65,0.90] };
+
+// ---------- state ----------
+let state = null;
+
+function freshState(){
+  const s = {
+    running:false, guardrails:true, shadowMode:false, mode:'demo', tick:0,
+    spend:0, baseline:0, requests:0, cacheHits:0, blocked:0,
+    perApp:{}, tierCounts:{small:0, mid:0, frontier:0, cache:0},
+    history:[], feed:[], shadow:{}, timer:null, runtimeApps:APPS
+  };
+  APPS.forEach(a => s.perApp[a.id] = { spend:0, blocked:0 });
+  return s;
+}
+state = freshState();
+
+function weightedApp(){
+  const total = APPS.reduce((s,a)=>s+a.weight,0);
+  let r = Math.random()*total;
+  for(const a of APPS){ if(r < a.weight) return a; r -= a.weight; }
+  return APPS[0];
+}
+function weightedComplexity(mix){
+  const r = Math.random();
+  if(r < mix.simple) return 'simple';
+  if(r < mix.simple+mix.medium) return 'medium';
+  return 'complex';
+}
+function tokensFor(complexity){
+  const [lo,hi] = TOKEN_RANGE[complexity];
+  return Math.round(lo + Math.random()*(hi-lo));
+}
+function classifyTokens(tokens){
+  if(tokens <= TOKEN_RANGE.simple[1]) return 'simple';
+  if(tokens <= TOKEN_RANGE.medium[1]) return 'medium';
+  return 'complex';
+}
+function simulateQualityMatch(complexity){
+  const [lo,hi] = QUALITY_RANGE[complexity];
+  return lo + Math.random()*(hi-lo);
+}
+function cost(tokens, tier){ return (tokens/1e6) * MODELS[tier].price; }
+function fmt$(n){ return '$' + n.toFixed(2); }
+
+function recordShadow(tier, actualCost, tokens, complexity){
+  const shadowTier = DOWNGRADE[tier];
+  if(!shadowTier) return;
+  const shadowCost = cost(tokens, shadowTier);
+  const potential = Math.max(0, actualCost - shadowCost);
+  const quality = simulateQualityMatch(complexity);
+  const key = tier + '->' + shadowTier;
+  if(!state.shadow[key]) state.shadow[key] = { count:0, qualitySum:0, savings:0 };
+  const s = state.shadow[key];
+  s.count++; s.qualitySum += quality; s.savings += potential;
+}
+
+// ---------- live simulation step ----------
+function generateRequest(forceApp, forceComplexity){
+  const app = forceApp || weightedApp();
+  const complexity = forceComplexity || weightedComplexity(app.mix);
+  const tokens = forceComplexity === 'complex' && forceApp ? tokensFor('complex') * 2 : tokensFor(complexity);
+  const tier = TIER_BY_COMPLEXITY[complexity];
+  const isCacheHit = !forceApp && Math.random() < app.cacheP;
+
+  const baselineCost = cost(tokens, 'frontier');
+  state.baseline += baselineCost;
+
+  let entry = { app: app.name, tokens, tier, cost:0, tag:'cache', blocked:false };
+
+  if(isCacheHit){
+    state.cacheHits++;
+    state.tierCounts.cache++;
+    entry.tag = 'cache';
+  } else {
+    const c = cost(tokens, tier);
+    const acc = state.perApp[app.id];
+    if(state.guardrails && acc.spend + c > app.budget){
+      state.blocked++;
+      acc.blocked++;
+      entry.tag = 'blocked';
+      entry.blocked = true;
+    } else {
+      acc.spend += c;
+      state.spend += c;
+      state.tierCounts[tier]++;
+      entry.cost = c;
+      entry.tag = tier;
+      if(state.shadowMode) recordShadow(tier, c, tokens, complexity);
+    }
+  }
+
+  state.requests++;
+  state.feed.unshift(entry);
+  if(state.feed.length > 10) state.feed.pop();
+  state.history.push({ t: state.tick++, spend: state.spend, baseline: state.baseline });
+  if(state.history.length > 60) state.history.shift();
+}
+
+function tick(){
+  const burst = 1 + Math.floor(Math.random()*2);
+  for(let i=0;i<burst;i++) generateRequest();
+  render();
+}
+
+function injectRunaway(){
+  const app = APPS.find(a=>a.id==='forecast');
+  for(let i=0;i<14;i++) generateRequest(app, 'complex');
+  render();
+}
+
+// ---------- CSV upload ----------
+function parseCSV(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(lines.length<2) return [];
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line=>{
+    const cells = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    const row = {};
+    headers.forEach((h,i)=> row[h]=cells[i]);
+    return row;
+  });
+}
+function findCol(row, names){
+  for(const n of names){ if(row[n] !== undefined && row[n] !== '') return row[n]; }
+  return undefined;
+}
+
+function loadUploadedData(rows, filename){
+  clearInterval(state.timer);
+
+  const CAP = 3000;
+  const trimmed = rows.slice(0, CAP);
+
+  state = freshState();
+  state.mode = 'upload';
+
+  const seenApps = {};
+  const runtimeApps = [];
+
+  trimmed.forEach(row=>{
+    const rawApp = findCol(row, ['app','application','team','service']) || 'Uploaded data';
+    let tokens = parseFloat(findCol(row,['tokens','total_tokens'])||'');
+    if(isNaN(tokens)){
+      const inTok = parseFloat(findCol(row,['input_tokens','prompt_tokens'])||'0')||0;
+      const outTok = parseFloat(findCol(row,['output_tokens','completion_tokens'])||'0')||0;
+      tokens = inTok+outTok;
+    }
+    if(!tokens || tokens<=0 || isNaN(tokens)) return;
+
+    if(!seenApps[rawApp]){
+      seenApps[rawApp] = true;
+      runtimeApps.push({ id:rawApp, name:rawApp, team:'From upload', budget:null });
+      state.perApp[rawApp] = { spend:0, blocked:0 };
+    }
+
+    const modelCol = (findCol(row,['model','tier'])||'').toLowerCase();
+    const complexity = classifyTokens(tokens);
+    const tier = ['small','mid','frontier'].includes(modelCol) ? modelCol : TIER_BY_COMPLEXITY[complexity];
+    const cachedCol = (findCol(row,['cached','cache_hit'])||'').toLowerCase();
+    const isCache = ['1','true','yes','y'].includes(cachedCol);
+
+    state.baseline += cost(tokens, 'frontier');
+
+    let entry = { app: rawApp, tokens, tier, cost:0, tag:'cache', blocked:false };
+
+    if(isCache){
+      state.cacheHits++;
+      state.tierCounts.cache++;
+    } else {
+      const c = cost(tokens, tier);
+      state.perApp[rawApp].spend += c;
+      state.spend += c;
+      state.tierCounts[tier]++;
+      entry.cost = c;
+      entry.tag = tier;
+      recordShadow(tier, c, tokens, complexity);
+    }
+
+    state.requests++;
+    state.feed.unshift(entry);
+    if(state.feed.length > 10) state.feed.pop();
+    state.history.push({ t: state.tick++, spend: state.spend, baseline: state.baseline });
+  });
+
+  if(state.history.length > 60){
+    const step = Math.ceil(state.history.length/60);
+    state.history = state.history.filter((_,i)=> i%step===0 || i===state.history.length-1);
+  }
+
+  state.runtimeApps = runtimeApps.length ? runtimeApps : APPS;
+
+  document.getElementById('uploadStatus').textContent =
+    filename + ' — ' + state.requests + ' rows loaded' + (rows.length>CAP ? ' (capped at '+CAP+')' : '');
+  document.getElementById('clearUploadBtn').style.display = 'inline-block';
+
+  playBtn.textContent = 'Start traffic';
+  playBtn.classList.add('primary');
+  playBtn.disabled = true;
+  speedSelect.disabled = true;
+  guardrailBtn.disabled = true;
+  shadowBtn.disabled = true;
+  document.getElementById('runawayBtn').disabled = true;
+
+  render();
+}
+
+function fullReset(){
+  clearInterval(state.timer);
+  state = freshState();
+  playBtn.textContent = 'Start traffic';
+  playBtn.classList.add('primary');
+  playBtn.disabled = false;
+  speedSelect.disabled = false;
+  guardrailBtn.textContent = 'Guardrails: on';
+  guardrailBtn.classList.remove('off');
+  guardrailBtn.disabled = false;
+  shadowBtn.textContent = 'Shadow mode: off';
+  shadowBtn.classList.remove('active');
+  shadowBtn.disabled = false;
+  document.getElementById('runawayBtn').disabled = false;
+  document.getElementById('csvInput').value = '';
+  document.getElementById('uploadStatus').textContent = '';
+  document.getElementById('clearUploadBtn').style.display = 'none';
+  render();
+}
+
+// ---------- rendering ----------
+function render(){
+  document.getElementById('statSpend').textContent = fmt$(state.spend);
+  document.getElementById('statSpendSub').textContent = state.requests + ' requests';
+  document.getElementById('statBaseline').textContent = fmt$(state.baseline);
+  const savingsPct = state.baseline > 0 ? Math.round((1 - state.spend/state.baseline)*100) : 0;
+  document.getElementById('statSavings').textContent = savingsPct + '%';
+  document.getElementById('statSavingsAbs').textContent = fmt$(Math.max(0,state.baseline-state.spend)) + ' kept';
+  const cacheRate = state.requests > 0 ? Math.round((state.cacheHits/state.requests)*100) : 0;
+  document.getElementById('statCache').textContent = cacheRate + '%';
+  document.getElementById('statCacheAbs').textContent = state.cacheHits + ' of ' + state.requests + ' requests';
+  document.getElementById('statBlocked').textContent = state.blocked;
+  document.getElementById('statBlockedSub').textContent = state.mode==='upload' ? 'not applicable to uploaded data' : (state.guardrails ? 'guardrails engaged' : 'guardrails off');
+
+  renderApps();
+  renderFeed();
+  renderLineChart();
+  renderBarChart();
+  renderShadow();
+}
+
+function renderApps(){
+  const grid = document.getElementById('appsGrid');
+  const apps = state.runtimeApps;
+  const maxSpend = Math.max(...apps.map(a=>state.perApp[a.id].spend), 0.01);
+  grid.innerHTML = apps.map(a=>{
+    const acc = state.perApp[a.id];
+    let pct, barClass, subLabel;
+    if(a.budget){
+      pct = Math.min(100, (acc.spend/a.budget)*100);
+      barClass = pct>=100?'red':pct>=75?'amber':'';
+      subLabel = `${fmt$(acc.spend)} / ${fmt$(a.budget)} budget`;
+    } else {
+      pct = (acc.spend/maxSpend)*100;
+      barClass = '';
+      subLabel = `${fmt$(acc.spend)} spend`;
+    }
+    const cardClass = a.budget && acc.blocked > 0 && pct >= 100 ? 'blocked' : '';
+    return `<div class="app-card ${cardClass}">
+      <div class="app-top">
+        <span class="app-name">${a.name}</span>
+      </div>
+      <div class="app-team">${a.team}</div>
+      <div class="app-spend">${subLabel}</div>
+      <div class="budget-bar"><div class="budget-fill ${barClass}" style="width:${pct}%"></div></div>
+      ${acc.blocked > 0 ? `<div class="app-blocked-tag">${acc.blocked} request${acc.blocked>1?'s':''} blocked</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function tierLabel(tag){
+  if(tag==='cache') return 'cache hit';
+  if(tag==='blocked') return 'blocked';
+  return MODELS[tag].label;
+}
+
+function renderFeed(){
+  const feed = document.getElementById('feed');
+  if(state.feed.length === 0){
+    feed.innerHTML = `<div class="feed-meta" style="padding:20px 0; text-align:center;">No requests yet — start traffic or upload a CSV to see the gateway route them.</div>`;
+    return;
+  }
+  feed.innerHTML = state.feed.map(e=>{
+    const costStr = e.tag==='cache' ? 'free' : e.tag==='blocked' ? '—' : fmt$(e.cost);
+    return `<div class="feed-row">
+      <div>
+        <div class="feed-app">${e.app}</div>
+        <div class="feed-meta">${e.tokens.toLocaleString()} tokens</div>
+      </div>
+      <span class="tier-tag ${e.tag}">${tierLabel(e.tag)}</span>
+      <span class="feed-cost">${costStr}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderLineChart(){
+  const svg = document.getElementById('lineChart');
+  const h = state.history;
+  if(h.length < 2){ svg.innerHTML = emptyChartMsg(700,220,'Chart fills in once traffic starts'); return; }
+  const w=700, H=220, padL=48, padR=16, padT=16, padB=28;
+  const maxY = Math.max(...h.map(d=>d.baseline), 1) * 1.08;
+  const x = i => padL + (i/(h.length-1)) * (w-padL-padR);
+  const y = v => H-padB - (v/maxY) * (H-padT-padB);
+  const path = arr => arr.map((d,i)=> (i===0?'M':'L') + x(i).toFixed(1) + ',' + y(arr[i]).toFixed(1)).join(' ');
+  const gridLines = [0,0.25,0.5,0.75,1].map(f=>{
+    const yy = H-padB - f*(H-padT-padB);
+    return `<line x1="${padL}" y1="${yy}" x2="${w-padR}" y2="${yy}" stroke="var(--border)" stroke-width="0.5"/>
+      <text x="${padL-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--text-faint)" font-family="var(--mono)">$${(f*maxY).toFixed(0)}</text>`;
+  }).join('');
+  svg.innerHTML = `${gridLines}
+    <path d="${path(h.map(d=>d.baseline))}" fill="none" stroke="var(--coral)" stroke-width="2"/>
+    <path d="${path(h.map(d=>d.spend))}" fill="none" stroke="var(--teal)" stroke-width="2"/>`;
+}
+
+function renderBarChart(){
+  const svg = document.getElementById('barChart');
+  const t = state.tierCounts;
+  const data = [
+    {k:'small', v:t.small, c:'var(--teal)', label:'Small'},
+    {k:'mid', v:t.mid, c:'var(--amber)', label:'Mid'},
+    {k:'frontier', v:t.frontier, c:'var(--coral)', label:'Frontier'},
+    {k:'cache', v:t.cache, c:'var(--text-faint)', label:'Cache'}
+  ];
+  const max = Math.max(...data.map(d=>d.v), 1);
+  const w=320, H=220, padB=26, padT=10, barW=52, gap=24;
+  let x = 30;
+  let bars = '';
+  data.forEach(d=>{
+    const bh = (d.v/max) * (H-padB-padT);
+    const by = H-padB-bh;
+    bars += `<rect x="${x}" y="${by}" width="${barW}" height="${bh}" rx="4" fill="${d.c}"/>
+      <text x="${x+barW/2}" y="${H-padB+16}" text-anchor="middle" font-size="11" fill="var(--text-dim)">${d.label}</text>
+      <text x="${x+barW/2}" y="${by-6}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--text)">${d.v}</text>`;
+    x += barW+gap;
+  });
+  svg.innerHTML = bars;
+}
+
+function renderShadow(){
+  const el = document.getElementById('shadowPanel');
+  const order = ['frontier->mid','mid->small'];
+  const active = order.filter(k=>state.shadow[k] && state.shadow[k].count>0);
+  if(active.length===0){
+    const msg = state.mode==='upload'
+      ? 'No eligible requests found in the upload — nothing routed to mid or frontier tiers.'
+      : (state.shadowMode ? 'Waiting for eligible requests…' : 'Turn on shadow mode, or upload usage data, to see this fill in.');
+    el.innerHTML = `<div class="feed-meta" style="padding:6px 0;">${msg}</div>`;
+    return;
+  }
+  el.innerHTML = active.map(k=>{
+    const s = state.shadow[k];
+    const avgQ = s.qualitySum/s.count;
+    const [from,to] = k.split('->');
+    const status = avgQ>=0.90 ? {label:'looks safe to promote', cls:'small'}
+                 : avgQ>=0.80 ? {label:'needs a closer look', cls:'mid'}
+                 : {label:'not ready yet', cls:'frontier'};
+    return `<div class="shadow-row">
+      <div class="shadow-path">${MODELS[from].label} → ${MODELS[to].label}</div>
+      <div class="shadow-cell">${s.count} evaluated</div>
+      <div class="shadow-cell">${Math.round(avgQ*100)}% match</div>
+      <div class="shadow-cell">${fmt$(s.savings)} identified</div>
+      <span class="tier-tag ${status.cls}">${status.label}</span>
+    </div>`;
+  }).join('');
+}
+
+function emptyChartMsg(w,h,msg){
+  return `<text x="${w/2}" y="${h/2}" text-anchor="middle" font-size="13" fill="var(--text-faint)">${msg}</text>`;
+}
+
+// ---------- controls ----------
+const playBtn = document.getElementById('playBtn');
+const speedSelect = document.getElementById('speedSelect');
+const guardrailBtn = document.getElementById('guardrailBtn');
+const shadowBtn = document.getElementById('shadowBtn');
+
+function startTimer(){
+  clearInterval(state.timer);
+  state.timer = setInterval(tick, parseInt(speedSelect.value,10));
+}
+
+playBtn.addEventListener('click', ()=>{
+  state.running = !state.running;
+  playBtn.textContent = state.running ? 'Pause traffic' : 'Start traffic';
+  playBtn.classList.toggle('primary', !state.running);
+  if(state.running) startTimer(); else clearInterval(state.timer);
+});
+speedSelect.addEventListener('change', ()=>{ if(state.running) startTimer(); });
+guardrailBtn.addEventListener('click', ()=>{
+  state.guardrails = !state.guardrails;
+  guardrailBtn.textContent = 'Guardrails: ' + (state.guardrails ? 'on' : 'off');
+  guardrailBtn.classList.toggle('off', !state.guardrails);
+});
+shadowBtn.addEventListener('click', ()=>{
+  state.shadowMode = !state.shadowMode;
+  shadowBtn.textContent = 'Shadow mode: ' + (state.shadowMode ? 'on' : 'off');
+  shadowBtn.classList.toggle('active', state.shadowMode);
+});
+document.getElementById('runawayBtn').addEventListener('click', injectRunaway);
+document.getElementById('resetBtn').addEventListener('click', fullReset);
+
+document.getElementById('csvInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    const rows = parseCSV(evt.target.result);
+    if(rows.length===0){ alert('Could not find any data rows in that file — check it has a header row plus at least one data row.'); return; }
+    loadUploadedData(rows, file.name);
+  };
+  reader.readAsText(file);
+});
+document.getElementById('clearUploadBtn').addEventListener('click', function(){
+  fullReset();
+});
+
+render();
+</script>
+</body>
+</html>
