@@ -1,0 +1,28 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	classify(classify)
+	compute_baseline(compute_baseline)
+	check_cache(check_cache)
+	check_budget(check_budget)
+	call_model(call_model)
+	serve_from_cache(serve_from_cache)
+	reject(reject)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> classify;
+	check_budget -.-> call_model;
+	check_budget -.-> reject;
+	check_cache -.-> check_budget;
+	check_cache -.-> serve_from_cache;
+	classify --> compute_baseline;
+	compute_baseline --> check_cache;
+	call_model --> __end__;
+	reject --> __end__;
+	serve_from_cache --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
