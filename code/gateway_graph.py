@@ -1,11 +1,11 @@
 """
-PrismGate — an enterprise AI gateway built on LangGraph.
+AI Gateway — an enterprise LLM routing gateway built on LangGraph.
 
 Every request flows through one graph: classify -> policy override -> compute
 baseline cost -> check cache -> check budget -> either serve from cache, call
 a model, or get rejected by the budget guardrail. Run it with LangSmith
 tracing enabled (see README.md) and every node shows up as a span in the
-trace tree. See ../architecture/prismgate-architecture.svg for the full
+trace tree. See ../architecture/ai-gateway-architecture.svg for the full
 diagram this module implements.
 
 Model calls use LangChain's FakeListChatModel so the demo runs with zero
@@ -22,7 +22,7 @@ from langchain_core.messages import HumanMessage
 
 from model_backends import make_model, REAL_MODELS_ENABLED
 
-PROJECT_NAME = "PrismGate"
+PROJECT_NAME = "AI Gateway"
 
 # ---------------------------------------------------------------------------
 # Model backends — mocked by default, real OpenAI/Claude calls if an API key
@@ -207,7 +207,7 @@ class AIGateway:
             initial["data_sensitive"] = True
         result = self.graph.invoke(
             initial,
-            config={"run_name": f"{PROJECT_NAME}::{APPS[app_id]['name']}", "tags": [app_id, "prismgate-demo"]},
+            config={"run_name": f"{PROJECT_NAME}::{APPS[app_id]['name']}", "tags": [app_id, "ai-gateway-demo"]},
         )
         if not result.get("blocked"):
             self.outcomes[app_id] += 1

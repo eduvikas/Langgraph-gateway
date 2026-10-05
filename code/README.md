@@ -1,6 +1,6 @@
-# PrismGate — LangGraph + LangSmith demo
+# AI Gateway — LangGraph + LangSmith demo
 
-The code implementation of PrismGate. For the full picture — the detailed
+The code implementation of AI Gateway. For the full picture — the detailed
 architecture diagram and the leadership-facing deck — see `../architecture/`
 and `../deck/` (this file focuses on running the code).
 
@@ -155,7 +155,7 @@ once plain, once flagged `data_sensitive=True`. The plain version routes to
 the frontier tier as its complexity would suggest; the flagged one gets
 forced onto the small, self-hosted tier regardless, and never reaches an
 external API. This is step 3 of the routing pipeline on the architecture
-diagram (`../architecture/prismgate-architecture.svg`) — policy overrides
+diagram (`../architecture/ai-gateway-architecture.svg`) — policy overrides
 run after complexity scoring but win over it. In `gateway_graph.py`, it's
 the `data_sensitive` check inside `classify()`; `result['policy_override']`
 tells you whether it fired.
@@ -163,6 +163,30 @@ tells you whether it fired.
 In production this flag would come from an upstream PII/data-classification
 check on the request, not a manual argument — wiring that in is the natural
 next step here.
+
+## The HTTP service — point a real agent at this
+
+Everything above runs in-process, as a Python demo. `server.py` wraps the
+same routing/cache/budget ideas as a real OpenAI-compatible HTTP service,
+so an actual agent (LangChain's `ChatOpenAI`, the `openai` SDK, anything
+that speaks the OpenAI API) can point at it by changing only `base_url`
+and `api_key`. It adds what a live multi-agent integration actually needs
+that the in-process demo doesn't: per-run budgets (not just per-app),
+capability-aware routing (tool calls bump off the small tier), and
+real request/response headers instead of return values.
+
+```bash
+uvicorn server:app --reload --port 8000
+python client_demo.py   # in another terminal — proves it with the real openai SDK
+```
+
+Full request/response contract, headers, and honest limitations in
+`README_SERVICE.md`.
+
+## Integrating a real application
+
+`integration/` has a copy-paste client helper (`gateway_client.py`), a complete LangGraph
+multi-agent example, and `INTEGRATION.md` explaining what changes in the application.
 
 ## Files
 
@@ -174,6 +198,10 @@ next step here.
 - `model_backends.py` — mocked models by default; real OpenAI models if
   `OPENAI_API_KEY` is set, or real Claude models if `ANTHROPIC_API_KEY` is
   set instead.
+- `server.py` / `classifier.py` / `state_store.py` / `schemas.py` /
+  `errors.py` — the OpenAI-compatible HTTP service; see `README_SERVICE.md`.
+- `client_demo.py` — proves the service with the real `openai` SDK, as a
+  small multi-step agent run.
 - `demo_runner.py` — fires realistic mixed traffic from all 5 apps.
 - `scenario_runaway_agent.py` — the budget-guardrail demo.
 - `scenario_policy_override.py` — the data-sensitivity routing override demo.

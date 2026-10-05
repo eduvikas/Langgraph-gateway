@@ -1,169 +1,71 @@
-# AI gateway — LangGraph + LangSmith demo
+# AI Gateway
 
-A working (not mocked-up) implementation of the gateway concept, built as a
-LangGraph state graph. Every request — from five simulated apps — flows
-through the same graph: classify complexity, price the no-gateway baseline,
-check the cache, check the app's budget, then either serve from cache, call
-a model, or get rejected by the guardrail.
+An enterprise AI gateway that routes every request to the cheapest capable
+model tier, caches repeat questions, enforces per-app budgets, and reports
+cost per business outcome instead of just cost per token.
 
-Model calls use LangChain's `FakeListChatModel`, so the whole thing runs
-with **zero API keys**. LangSmith tracing is optional but is where this
-gets compelling to show live — every node becomes a span in the trace tree.
+## What's in here
 
-## Setup (Windows, PowerShell)
+- **`code/`** — the working implementation. A LangGraph state graph you can
+  actually run: `pip install -r code/requirements.txt`, then
+  `python code/demo_runner.py`. Runs with zero API keys out of the box;
+  see `code/README.md` for wiring in real OpenAI or Claude models, live
+  LangSmith tracing, and the three demo scenarios (runaway-agent guardrail,
+  policy override, cost-per-outcome report). Also includes `server.py` — a
+  real OpenAI-compatible HTTP service a live agent can point at (see
+  `code/README_SERVICE.md`), proven end to end with `client_demo.py` using
+  the actual `openai` SDK.
 
-```powershell
-py -m venv venv
-venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+- **`architecture/`** — the detailed reference architecture.
+  `ai-gateway-architecture.svg` (vector, editable in Illustrator/Inkscape/
+  any text editor) and a rendered `.png` of the same diagram. Covers the
+  full routing/decision pipeline — feature extraction, complexity scoring,
+  policy override, cache lookup, budget guardrail, tier thresholds — and
+  the small tier's breakdown into CPU cluster, GPU cluster, specialized
+  accelerator cluster, and burst/spot GPU cluster, each with the reasoning
+  behind it.
+  `ai-gateway-integration-overview.png` is the one-page high-level view
+  with the "how it fits into the bank's existing ecosystem" section added.
 
-If PowerShell blocks the activation script the first time, run this once
-in an admin PowerShell, then retry: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+- **`deck/`** — `ai-gateway-overview.pptx`, 4 slides, fully editable in
+  PowerPoint: the problem, challenges vs. benefits, technology stack, and
+  the roadmap. Built to match the diagram and dashboard visually (same
+  navy/teal/amber/coral palette throughout).
 
-Using cmd.exe instead of PowerShell? Activate with `venv\Scripts\activate.bat`.
+- **`dashboard/`** — `ai-gateway-dashboard.html`, the interactive browser
+  demo: live simulated traffic, a policy-override demo ("Inject sensitive
+  request" forces the small tier regardless of complexity — the live
+  version of `code/scenario_policy_override.py`), shadow-mode routing
+  evaluation, a cost-per-outcome panel, a small-tier infrastructure
+  breakdown (CPU / GPU / specialized / burst), and CSV upload to replay
+  real usage data. Open the `.html` file directly in a browser, no install
+  needed. `sample-usage.csv` is a ready-made file to try the upload with,
+  including a `sensitive` column example.
 
-Set your keys for the current session (PowerShell):
+- **`earlier-poc/`** — a separate, earlier proof of concept (standard library only):
+  five mock apps, four scenarios replayed on identical traffic, SQLite metering. It
+  models cost and savings; `code/` is the live service. See its own README.
 
-```powershell
-$env:OPENAI_API_KEY = "sk-..."
-$env:LANGCHAIN_TRACING_V2 = "true"
-$env:LANGCHAIN_API_KEY = "ls__..."       # your LangSmith key, from smith.langchain.com
-$env:LANGCHAIN_PROJECT = "ai-gateway-demo"
-```
+- **`GUIDE.md`** — start here: step-by-step walkthrough, how complexity and token
+  counts are calculated, and likely Q&A.
 
-`$env:` variables only last for that PowerShell window. To make them
-permanent across sessions, use `setx` instead (then open a **new** terminal
-for it to take effect):
+## Suggested order for a leadership walkthrough
 
-```powershell
-setx OPENAI_API_KEY "sk-..."
-setx LANGCHAIN_TRACING_V2 "true"
-setx LANGCHAIN_API_KEY "ls__..."
-setx LANGCHAIN_PROJECT "ai-gateway-demo"
-```
+1. **Deck, slides 1–2** — the problem and the challenges/benefits framing.
+2. **Architecture diagram** — how a request actually gets routed, and why
+   the self-hosted tiers are split the way they are.
+3. **Dashboard** — click "Start traffic," then "Inject runaway agent" with
+   guardrails on vs. off. Then "Inject sensitive request" to show the same
+   contract-summarizer request routing two different ways depending on a
+   data-sensitivity flag. This is the moment that tends to land.
+4. **Code, live** — `python scenario_policy_override.py` and
+   `python scenario_runaway_agent.py` in a terminal, or the same traffic
+   traced live in LangSmith if you've set that up beforehand.
+5. **Deck, slides 3–4** — technology stack and roadmap, to close.
 
-macOS/Linux equivalent, if you ever run this elsewhere:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-export OPENAI_API_KEY=sk-...
-```
+## Consistency note
 
-## Run it offline (no tracing, no API key)
-
-```powershell
-python demo_runner.py
-```
-
-Prints a live routing table for 40 simulated requests, then a summary:
-gateway spend vs. the no-gateway baseline, cache hit rate, and savings %.
-Useful as a first sanity check that the venv and install worked before
-wiring in real keys.
-
-## Switch to real OpenAI models
-
-With `OPENAI_API_KEY` set (see above), the gateway automatically routes
-real calls to OpenAI instead of the mock:
-
-```powershell
-python demo_runner.py
-```
-
-`model_backends.py` maps each tier to a real model —
-`gpt-4.1-nano` (small) / `gpt-4.1-mini` (mid) / `gpt-5.1` (frontier).
-Nothing else changes — same graph, same routing, same guardrail. The only
-functional difference: `call_model` now reads the model's actual
-`usage_metadata` for token counts instead of the pre-classified estimate,
-so cost figures become real rather than simulated. `max_completion_tokens`
-is capped at 60 in the mock-to-real swap so a demo run doesn't rack up a
-real bill — raise it once you're past the demo.
-
-If you'd rather point this at Claude, set `ANTHROPIC_API_KEY` instead (and
-`pip install langchain-anthropic`) — same behavior, different provider.
-`TIER_TO_MODEL` in `model_backends.py` is where you'd edit either mapping,
-including pointing "small" at a self-hosted endpoint instead of a hosted API.
-
-## Cost-per-outcome report (the leadership number)
-
-Cost-per-token is a finance-team argument. "Resolving a support ticket now
-costs $X instead of $Y" is the one that survives being repeated outside
-engineering. Each app is tagged with an outcome label (ticket resolved, PR
-reviewed, contract reviewed, forecast generated, question answered), and
-every non-blocked request counts as one outcome delivered.
-
-```powershell
-python roi_report.py --requests 300 --csv roi_report.csv
-```
-
-Prints a per-app table of outcomes delivered, cost per outcome, what that
-outcome would have cost with no gateway, and the % reduction — plus writes
-a CSV you can paste straight into a sheet or slide. `sample_roi_report.csv`
-is a saved example run. Works with either the mock or a real model — set
-`OPENAI_API_KEY` first if you want real numbers here too, though with 300
-requests that will make 300 real API calls, so mind the cost.
-
-## Run it with live LangSmith tracing (the actual demo)
-
-With `LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`, and `LANGCHAIN_PROJECT`
-set (see the setup section above — this is what "using your LangChain
-account" means: LangSmith is the tracing product tied to it, and the key
-comes from https://smith.langchain.com under Settings → API Keys):
-
-```powershell
-python demo_runner.py
-```
-
-Then open your project at https://smith.langchain.com. Click into any run
-and you'll see the actual graph execute as a trace tree:
-`classify → compute_baseline → check_cache → check_budget → call_model` (or
-`serve_from_cache` / `reject` depending on the branch taken), each with its
-own latency and input/output. That trace tree **is** the architecture
-diagram from the slides, except it's real and clickable. If you also set
-`OPENAI_API_KEY`, each `call_model` span shows the real prompt, response,
-and token usage from OpenAI.
-
-Runs are tagged by app ID, so you can filter the LangSmith project by app
-(`support`, `codereview`, `contracts`, `forecast`, `wiki`) mid-demo.
-
-## The guardrail scenario
-
-```bash
-python scenario_runaway_agent.py
-```
-
-Fires 25 large requests from one app in a tight loop, the way a stuck agent
-retry-loop would. Watch the `Blocked` column flip to `True` once that app's
-daily budget is exhausted — everything after that short-circuits before
-touching a model, at zero cost. This is the single moment that tends to
-land hardest with leadership: point at the terminal, not a slide, when it
-happens.
-
-## Files
-
-- `gateway_graph.py` — the graph: state schema, nodes, conditional routing,
-  the `AIGateway` class (shared cache, per-app spend, outcomes).
-- `model_backends.py` — mocked models by default; real OpenAI models if
-  `OPENAI_API_KEY` is set, or real Claude models if `ANTHROPIC_API_KEY` is
-  set instead.
-- `demo_runner.py` — fires realistic mixed traffic from all 5 apps.
-- `scenario_runaway_agent.py` — the budget-guardrail demo.
-- `roi_report.py` — the cost-per-outcome report, with optional CSV export.
-- `sample_roi_report.csv` — a saved example of that report's output.
-- `architecture.mmd` — the graph exported as Mermaid, if you want a static
-  diagram alongside the live trace (paste into mermaid.live or a docs page).
-
-## Going from here to production
-
-- Replace the in-memory `cache` / `spend` dicts with Redis and your real
-  billing store.
-- Add a `MemorySaver` or a Postgres checkpointer (`langgraph.checkpoint`)
-  if you want the graph to persist and resume state across requests.
-- The shadow-mode / quality-comparison idea from the earlier prototype
-  slots in as one more conditional branch off `call_model`, calling a
-  second, cheaper model in parallel and logging the comparison without
-  serving its output.
-- Wire `cost_per_outcome()` to a real outcome signal (ticket closed in
-  your helpdesk tool, PR merged) instead of "request wasn't blocked" —
-  that's the honest version of the same metric.
+The diagram, deck, and dashboard intentionally share one visual language
+(teal = small/self-hosted tier, amber = mid tier, coral = frontier tier) so
+the audience doesn't have to re-learn a color code between artifacts. If
+you rebrand or re-theme any one of them, update the others to match.

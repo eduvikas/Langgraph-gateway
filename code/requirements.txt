@@ -3,3 +3,8 @@ langchain-core
 langsmith
 langchain-openai      # for real OpenAI models (set OPENAI_API_KEY to use)
 # langchain-anthropic # uncomment if you'd rather use Claude (set ANTHROPIC_API_KEY instead)
+
+# --- for the HTTP service (server.py) ---
+fastapi
+uvicorn[standard]
+openai                # only needed to run client_demo.py
