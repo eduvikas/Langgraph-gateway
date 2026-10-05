@@ -24,6 +24,8 @@ cost per business outcome instead of just cost per token.
   the small tier's breakdown into CPU cluster, GPU cluster, specialized
   accelerator cluster, and burst/spot GPU cluster, each with the reasoning
   behind it.
+  `ai-gateway-integration-architecture.svg/.png` shows how the gateway plugs into an
+  existing application (what changes, what does not, which pieces are production additions).
   `ai-gateway-integration-overview.png` is the one-page high-level view
   with the "how it fits into the bank's existing ecosystem" section added.
 
