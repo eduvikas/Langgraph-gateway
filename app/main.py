@@ -8,6 +8,6 @@ from app.api.routes_security import router as security_router
 from app.api.routes_control_tower import router as control_tower_router
 from app.config import get_settings
 from app.observability.logging import configure_logging
-settings=get_settings(); configure_logging(settings.log_level)
+settings=get_settings(); settings.validate_security_configuration(); configure_logging(settings.log_level)
 app=FastAPI(title="LangGraph Gateway V2.3",version="2.6.0",description="Enterprise AI Gateway with identity, RBAC, content security, data classification, audit, durable memory and governance.")
 app.include_router(health_router); app.include_router(chat_router,prefix="/v1"); app.include_router(sessions_router,prefix="/v1"); app.include_router(config_router,prefix="/v1"); app.include_router(usage_router,prefix="/v1"); app.include_router(security_router,prefix="/v1"); app.include_router(control_tower_router,prefix="/v1")

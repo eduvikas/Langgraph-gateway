@@ -38,6 +38,11 @@ class IdentityProvider:
             raise IdentityError("APPLICATION_NOT_ASSIGNED")
         if requested_user_id and requested_user_id != user_id:
             raise IdentityError("USER_ID_MISMATCH")
+        # Chat/application requests must be explicitly scoped in the token.
+        # Control-plane authentication passes application_id=None and is not
+        # subject to an application claim.
+        if application_id is not None and not applications:
+            raise IdentityError("APPLICATION_CLAIM_REQUIRED")
         return Identity(user_id, roles, applications, claims, True)
 
     @staticmethod

@@ -19,6 +19,26 @@ class Settings(BaseModel):
     circuit_failure_threshold:int=int(os.getenv('CIRCUIT_FAILURE_THRESHOLD','3')); circuit_recovery_seconds:int=int(os.getenv('CIRCUIT_RECOVERY_SECONDS','30'))
     evaluation_enabled:bool=os.getenv('EVALUATION_ENABLED','true').lower()=='true'; evaluation_min_score:float=float(os.getenv('EVALUATION_MIN_SCORE','0.65'))
     allowed_applications_raw:str=os.getenv('ALLOWED_APPLICATIONS','demo-app,contract-agent,sre-agent'); allowed_models_raw:str=os.getenv('ALLOWED_MODELS','gpt-5.6-sol,gpt-5.6-terra,gpt-5.6-luna')
+    def validate_security_configuration(self) -> None:
+        """Fail closed for unsafe production security settings.
+
+        Local/test defaults remain convenient for development, but must never
+        silently carry into a production deployment.
+        """
+        environment = self.app_env.strip().lower()
+        if environment not in {"production", "prod"}:
+            return
+        if not self.auth_enabled:
+            raise ValueError("INSECURE_CONFIGURATION: AUTH_ENABLED must be true in production")
+        if self.allow_insecure_local_auth:
+            raise ValueError("INSECURE_CONFIGURATION: ALLOW_INSECURE_LOCAL_AUTH must be false in production")
+        if self.jwt_secret.strip() in {"", "change-me-in-production", "secret", "changeme"}:
+            raise ValueError("INSECURE_CONFIGURATION: JWT_SECRET must be changed in production")
+        if self.jwt_algorithm.upper().startswith("HS") and len(self.jwt_secret.encode("utf-8")) < 32:
+            raise ValueError("INSECURE_CONFIGURATION: HMAC JWT_SECRET must be at least 32 bytes in production")
+        if self.jwt_algorithm.lower() == "none":
+            raise ValueError("INSECURE_CONFIGURATION: JWT algorithm 'none' is not permitted")
+
     @property
     def allowed_applications(self): return {x.strip() for x in self.allowed_applications_raw.split(',') if x.strip()}
     @property

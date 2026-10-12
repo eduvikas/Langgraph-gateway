@@ -1,5 +1,15 @@
 # LangGraph Gateway — V2.4 → V2.6 Enterprise Edition
 
+## Security hardening added during verification
+
+The verification pass adds a startup guard for production-like environments (`APP_ENV=production` or `prod`). Startup now fails when authentication is disabled, local-auth bypass is enabled, the JWT secret is a known default/empty value, an HMAC JWT secret is shorter than 32 bytes, or the JWT algorithm is `none`. Local development defaults remain available when `APP_ENV=local`.
+
+For application-scoped chat requests with `AUTH_ENABLED=true`, JWTs must now include an `applications` or `apps` claim that explicitly includes the requested application (or `*`). Control-plane authentication is separate and does not require an application claim. See `VERIFICATION_REPORT.md` for tests run and known limitations.
+
+**Important:** these guards are a baseline, not a complete production security certification. Use managed secret storage, verify issuer/audience configuration for your identity provider, and run the full dependency-complete test suite before deployment.
+
+---
+
 ## 1. What this project is
 
 This repository is the consolidated end-state of the LangGraph Gateway roadmap.
