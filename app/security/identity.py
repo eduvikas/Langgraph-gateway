@@ -17,7 +17,7 @@ class IdentityProvider:
     def __init__(self, settings):
         self.settings = settings
 
-    def authenticate(self, authorization: str | None, requested_user_id: str, application_id: str) -> Identity:
+    def authenticate(self, authorization: str | None, requested_user_id: str, application_id: str | None = None) -> Identity:
         if not self.settings.auth_enabled:
             if not requested_user_id:
                 raise IdentityError("USER_ID_REQUIRED")
@@ -34,7 +34,7 @@ class IdentityProvider:
             raise IdentityError("TOKEN_SUBJECT_REQUIRED")
         roles = self._as_set(claims.get("roles") or claims.get("role") or "viewer")
         applications = self._as_set(claims.get("applications") or claims.get("apps") or "")
-        if applications and application_id not in applications and "*" not in applications:
+        if application_id is not None and applications and application_id not in applications and "*" not in applications:
             raise IdentityError("APPLICATION_NOT_ASSIGNED")
         if requested_user_id and requested_user_id != user_id:
             raise IdentityError("USER_ID_MISMATCH")

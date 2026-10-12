@@ -11,15 +11,16 @@ from app.evaluation.store import store as evaluation_store
 from app.security.policy import classification_allowed
 logger=get_logger(__name__)
 
-PRICING={'gpt-5.6-sol':(4.0,20.0),'gpt-6-sol':(1.0,5.0),'gpt-6-luna':(.05,.25),'mock-general':(0,0)}
+# USD per 1M tokens (input, output), from OpenAI's model page. Re-check before relying on cost figures.
+PRICING={'gpt-5.6-sol':(4.0,20.0),'gpt-5.6-terra':(2.0,12.0),'gpt-5.6-luna':(0.20,1.20),'mock-general':(0,0)}
 def estimate_cost(model,inp,out):
     a,b=PRICING.get(model,(0,0)); return round(inp*a/1_000_000+out*b/1_000_000,8)
 
 def build_gateway_graph(settings,memory,governance,rate_limiter,audit):
-    identity_provider=IdentityProvider(settings); security=ContentSecurityEngine(); health=ProviderHealth(settings.circuit_failure_threshold,settings.circuit_recovery_seconds)
+    identity_provider=IdentityProvider(settings); security=ContentSecurityEngine(strict_injection=settings.injection_strict); health=ProviderHealth(settings.circuit_failure_threshold,settings.circuit_recovery_seconds)
     profiles=[]
     if settings.openai_api_key:
-        profiles=[ModelProfile('openai','gpt-5.6-sol',4,20,0.95,0.70,{'general','reasoning','coding'}),ModelProfile('openai','gpt-6-sol',1,5,0.92,0.82,{'general','reasoning','coding'}),ModelProfile('openai','gpt-6-luna',.05,.25,0.82,0.96,{'general','general_fast'})]
+        profiles=[ModelProfile('openai','gpt-5.6-sol',4,20,0.95,0.70,{'general','reasoning','coding'}),ModelProfile('openai','gpt-5.6-terra',2,12,0.92,0.82,{'general','reasoning','coding'}),ModelProfile('openai','gpt-5.6-luna',.20,1.20,0.82,0.96,{'general','general_fast'})]
     if settings.mock_provider_enabled: profiles.append(ModelProfile('mock','mock-general',0,0,.40,1.0,{'general','general_fast'}))
     router=IntelligentRouter(profiles,health); evaluator=EvaluationEngine()
     def identity_node(state):
@@ -31,28 +32,31 @@ def build_gateway_graph(settings,memory,governance,rate_limiter,audit):
     def governance_node(state):
         count=memory.increment_request_count(state['session_id'],state['user_id'],state['application_id']); allowed_rate,remaining=rate_limiter.allow(f"user:{state['user_id']}")
         route=router.choose(settings.routing_task,settings.routing_priority)
-        d=governance.evaluate(state['application_id'],route.model,state['prompt'],count,allowed_rate,state.get('roles',set()),state.get('data_classification','internal'),state.get('security_reason') or None)
+        d=governance.evaluate(state['application_id'],route.model,state['prompt'],count,allowed_rate,state.get('roles',set()),state.get('data_classification','internal'),state.get('security_reason') or None,has_pii=any(f['category']=='PII' for f in state.get('security_findings',[])))
         return {'decision':'ALLOW' if d.allowed else 'BLOCK','block_reason':d.reason or '','request_count':count,'rate_remaining':remaining,'selected_provider':route.provider,'selected_model':route.model,'route_reason':route.reason,'route_score':route.score}
     def memory_node(state): return {'history':memory.get_history(state['session_id'],state['user_id'])}
     def execute_node(state):
         ranked=router.rank(settings.routing_task,settings.routing_priority)
+        # Failover may only land on models this application is allowed to use.
+        policy=governance.policy_store.get(state['application_id']); allowed=policy.allowed_models or settings.allowed_models
         last_error=None
-        result=None
+        result=None; used=None; failed=[]
         for _,profile in ranked:
+            if profile.model not in allowed: continue
             key=f"{profile.provider}:{profile.model}"; started=perf_counter()
             try:
                 provider=get_provider(settings,profile.provider); result=provider.generate(prompt=state['prompt'],history=state.get('history',[]),model=profile.model,max_output_tokens=settings.max_output_tokens)
                 health.record_success(key,(perf_counter()-started)*1000)
-                state['selected_provider']=profile.provider; state['selected_model']=profile.model
+                used=profile
                 break
             except Exception as exc:
-                health.record_failure(key); last_error=exc
-        if result is None: raise RuntimeError(f'ALL_MODELS_FAILED: {last_error}')
+                health.record_failure(key); last_error=exc; failed.append(profile.model)
+        if result is None: raise RuntimeError(f"ALL_MODELS_FAILED: {last_error or 'no allowed model available'}")
         memory.append(state['session_id'],'user',state['prompt'],state['user_id'],state['application_id']); memory.append(state['session_id'],'assistant',result.text,state['user_id'],state['application_id'])
         cost=estimate_cost(result.model,result.input_tokens,result.output_tokens)
         evaluation=evaluator.evaluate(state['prompt'],result.text,state.get('security_findings',[]))
         evaluation_store.record(request_id=state['request_id'],model=result.model,provider=result.provider,overall=evaluation.overall,passed=evaluation.passed,reasons=evaluation.reasons)
-        return {'response':result.text,'input_tokens':result.input_tokens,'output_tokens':result.output_tokens,'total_tokens':result.total_tokens,'cache_hit':False,'estimated_cost_usd':cost,'evaluation':evaluation.__dict__}
+        return {'selected_provider':used.provider,'selected_model':used.model,'failed_models':failed,'response':result.text,'input_tokens':result.input_tokens,'output_tokens':result.output_tokens,'total_tokens':result.total_tokens,'cache_hit':False,'estimated_cost_usd':cost,'evaluation':evaluation.__dict__}
     def finalize_node(state):
         audit.record(event_type='CHAT_COMPLETED',request_id=state['request_id'],user_id=state['user_id'],application_id=state['application_id'],session_id=state['session_id'],outcome=state.get('decision','UNKNOWN'),classification=state.get('data_classification','internal'),details=state.get('block_reason') or None)
         logger.info('gateway_completed',extra={'request_id':state['request_id']}); return {}

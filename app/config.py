@@ -14,11 +14,11 @@ class Settings(BaseModel):
     rate_limiter_backend:str=os.getenv('RATE_LIMITER_BACKEND','memory'); redis_url:str=os.getenv('REDIS_URL','redis://localhost:6379/0')
     policy_file:str=os.getenv('POLICY_FILE','config/policies.json'); auth_enabled:bool=os.getenv('AUTH_ENABLED','false').lower()=='true'
     jwt_secret:str=os.getenv('JWT_SECRET','change-me-in-production'); jwt_algorithm:str=os.getenv('JWT_ALGORITHM','HS256'); jwt_issuer:str=os.getenv('JWT_ISSUER',''); jwt_audience:str=os.getenv('JWT_AUDIENCE','')
-    allow_insecure_local_auth:bool=os.getenv('ALLOW_INSECURE_LOCAL_AUTH','true').lower()=='true'; block_secrets:bool=os.getenv('BLOCK_SECRETS','true').lower()=='true'; block_prompt_injection:bool=os.getenv('BLOCK_PROMPT_INJECTION','true').lower()=='true'
+    allow_insecure_local_auth:bool=os.getenv('ALLOW_INSECURE_LOCAL_AUTH','true').lower()=='true'; block_secrets:bool=os.getenv('BLOCK_SECRETS','true').lower()=='true'; block_prompt_injection:bool=os.getenv('BLOCK_PROMPT_INJECTION','true').lower()=='true'; injection_strict:bool=os.getenv('INJECTION_STRICT','false').lower()=='true'
     routing_priority:str=os.getenv('ROUTING_PRIORITY','balanced'); routing_task:str=os.getenv('ROUTING_TASK','general'); mock_provider_enabled:bool=os.getenv('MOCK_PROVIDER_ENABLED','true').lower()=='true'
     circuit_failure_threshold:int=int(os.getenv('CIRCUIT_FAILURE_THRESHOLD','3')); circuit_recovery_seconds:int=int(os.getenv('CIRCUIT_RECOVERY_SECONDS','30'))
     evaluation_enabled:bool=os.getenv('EVALUATION_ENABLED','true').lower()=='true'; evaluation_min_score:float=float(os.getenv('EVALUATION_MIN_SCORE','0.65'))
-    allowed_applications_raw:str=os.getenv('ALLOWED_APPLICATIONS','demo-app,contract-agent,sre-agent'); allowed_models_raw:str=os.getenv('ALLOWED_MODELS','gpt-5.6-sol,gpt-6-sol,gpt-6-luna')
+    allowed_applications_raw:str=os.getenv('ALLOWED_APPLICATIONS','demo-app,contract-agent,sre-agent'); allowed_models_raw:str=os.getenv('ALLOWED_MODELS','gpt-5.6-sol,gpt-5.6-terra,gpt-5.6-luna')
     @property
     def allowed_applications(self): return {x.strip() for x in self.allowed_applications_raw.split(',') if x.strip()}
     @property
