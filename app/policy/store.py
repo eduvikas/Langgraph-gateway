@@ -12,10 +12,12 @@ class AppPolicy:
     allow_pii: bool = True
     allow_secrets: bool = False
     allow_prompt_injection: bool = False
+    daily_budget_usd: float | None = None   # None = use DEFAULT_DAILY_BUDGET_USD; 0 = unlimited
+    allow_cache: bool = True                # False: never cache this application's answers
 class PolicyStore:
     def __init__(self, path, settings): self.path=Path(path); self.settings=settings; self.policies=self._load()
     def _load(self):
         if not self.path.exists(): return {}
         raw=json.loads(self.path.read_text(encoding="utf-8"))
-        return {k: AppPolicy(v.get("enabled",True), set(v.get("allowed_models",[])) or None, v.get("max_requests_per_session"), v.get("max_prompt_chars"), set(v.get("required_roles",[])) or None, v.get("max_data_classification","confidential"), v.get("allow_pii",True), v.get("allow_secrets",False), v.get("allow_prompt_injection",False)) for k,v in raw.get("applications",{}).items()}
+        return {k: AppPolicy(v.get("enabled",True), set(v.get("allowed_models",[])) or None, v.get("max_requests_per_session"), v.get("max_prompt_chars"), set(v.get("required_roles",[])) or None, v.get("max_data_classification","confidential"), v.get("allow_pii",True), v.get("allow_secrets",False), v.get("allow_prompt_injection",False),v.get("daily_budget_usd"),v.get("allow_cache",True)) for k,v in raw.get("applications",{}).items()}
     def get(self, application_id): return self.policies.get(application_id, AppPolicy())

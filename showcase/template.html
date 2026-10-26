@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Gateway: what actually happened</title>
+<style>
+:root{--bg:#f6f8f8;--card:#fff;--ink:#14212a;--dim:#5d6f78;--line:#dbe3e6;--teal:#12a384;--amber:#c9871b;--coral:#d4553f;--sol:#6d5bd0;--terra:#2f7fd1;--luna:#12a384;--cache:#8795a0;--blk:#d4553f;--ok:#12a384}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0b1215;--card:#121b1f;--ink:#e4ecea;--dim:#8ca0a6;--line:#243339;--teal:#35c6a6;--amber:#e8a33d;--coral:#e8735d;--sol:#9a8cf5;--terra:#5ea6ee;--luna:#35c6a6;--cache:#6f828c;--blk:#e8735d;--ok:#35c6a6}}
+:root[data-theme=dark]{--bg:#0b1215;--card:#121b1f;--ink:#e4ecea;--dim:#8ca0a6;--line:#243339;--teal:#35c6a6;--amber:#e8a33d;--coral:#e8735d;--sol:#9a8cf5;--terra:#5ea6ee;--luna:#35c6a6;--cache:#6f828c;--blk:#e8735d;--ok:#35c6a6}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",system-ui,sans-serif;padding:max(18px,env(safe-area-inset-top,0px)) 16px max(28px,env(safe-area-inset-bottom,0px))}
+.w{max-width:1100px;margin:0 auto}h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--dim);margin:0 0 12px;max-width:720px}.badge{display:inline-block;border:1px solid var(--teal);color:var(--teal);border-radius:99px;padding:2px 10px;font-size:12px;margin:0 6px 6px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.k b{display:block;font-size:26px;line-height:1.1}.k span{color:var(--dim);font-size:13px}
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr))}.two .card{margin:0}
+.story li{margin:4px 0}.chk{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line)}.chk:first-of-type{border:0}.mk{font-weight:700;width:18px}.pass{color:var(--ok)}.fail{color:var(--coral)}.chk small{display:block;color:var(--dim)}
+svg{width:100%;height:auto;display:block}.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--dim);margin-top:8px}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden}.bar>div{height:100%}.row{margin:10px 0}.row div.t{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+button{font:inherit;font-size:13px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}button.on{border-color:var(--teal);color:var(--teal)}
+.fl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}th{color:var(--dim);font-weight:500;text-align:left}td,th{padding:6px 8px;border-top:1px solid var(--line)}tr.r{cursor:pointer}tr.r:hover{background:color-mix(in srgb,var(--teal) 8%,transparent)}
+.ch{border-radius:6px;padding:1px 8px;font-size:12px;color:#fff;white-space:nowrap}.num{text-align:right;font-variant-numeric:tabular-nums}.ins{background:color-mix(in srgb,var(--teal) 6%,transparent);font-size:13px}.ins pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;background:var(--bg);padding:8px;border-radius:8px;max-height:220px;overflow:auto}
+small.n{color:var(--dim)}a,summary{color:var(--teal);cursor:pointer}footer{color:var(--dim);font-size:13px}code{background:var(--bg);padding:1px 6px;border-radius:5px}
+</style></head><body><div class="w">
+<span class="badge">Real gateway run</span><span class="badge">Simulated model provider</span><span class="badge" id="when"></span>
+<h1>AI Gateway: what actually happened</h1>
+<p class="sub">Every figure below is computed in your browser from the records one real run of the gateway produced: its usage ledger, audit trail and budget state. Click any request to see why it was routed, served or stopped.</p>
+<div class="card story"><h2>What to notice</h2><ul id="story" style="margin:0;padding-left:20px"></ul></div>
+<div class="g" id="kpi" style="margin-bottom:14px"></div>
+<div class="card"><h2>Proof: do the pictures match the records?</h2><div id="proof"></div></div>
+<div class="two" style="margin-bottom:14px">
+<div class="card"><h2>Spend, request by request</h2><div id="cA"></div><div class="lg"><span><i style="background:var(--teal)"></i>Actual metered cost</span><span><i style="background:var(--cache)"></i>If every request had used the premium model</span></div></div>
+<div class="card"><h2>Where each application’s requests went</h2><div id="cB"></div><div class="lg" id="lgB"></div></div></div>
+<div class="two" style="margin-bottom:14px">
+<div class="card"><h2>Daily budgets</h2><div id="bud"></div></div>
+<div class="card"><h2>Stopped before reaching any model</h2><div id="blk"></div></div></div>
+<div class="card"><h2>Every request, with its audit record</h2><div class="fl" id="fl"></div><div class="tw"><table><thead><tr><th>#</th><th>Application</th><th>Outcome</th><th>Why</th><th class="num">Cost</th><th class="num">Tokens</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+<footer><details><summary>What is real and what is simulated</summary><p><b>Real gateway code:</b> identity and application allowlist, content security, routing and ranking, policy, budget reservations, response cache, failover and circuit breaker, usage ledger, audit trail.<br><b>Simulated:</b> the model provider (deterministic token counts, a scripted outage) and the traffic itself. Prices come from the repository’s fixture table, so dollar figures show how the mechanics work, not billed spend or forecast savings.</p></details>
+<p>Reproduce: <code id="cmd"></code> · <a id="dl">Download run data (JSON)</a></p></footer></div>
+<script type="application/json" id="d">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('d').textContent),$=s=>document.querySelector(s),sum=(a,f)=>a.reduce((s,x)=>s+f(x),0),eq=(a,b)=>Math.abs(a-b)<1e-6;
+const $$=n=>'$'+n.toFixed(n<.1?4:3),pc=n=>Math.round(n*100)+'%',short=m=>(m||'').replace('gpt-5.6-',''),esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const L=Object.fromEntries(D.ledger.map(r=>[r.request_id,r])),A=Object.fromEntries(D.audit.map(r=>[r.request_id,r]));
+const R=D.requests.map(r=>{const l=L[r.request_id]||{};return{...r,l,a:A[r.request_id]||{},cost:l.cost_usd||0,base:l.baseline_cost_usd||0,tok:l.total_tokens||0}});
+const kind=r=>r.decision==='BLOCK'?'blocked':r.failed_over_from.length?'failover':r.cache_hit?'cached':'served';
+const seg=r=>r.decision==='BLOCK'?'blocked':r.cache_hit?'cache':short(r.model);
+const col={sol:'var(--sol)',terra:'var(--terra)',luna:'var(--luna)',cache:'var(--cache)',blocked:'var(--blk)'};
+const T=D.economics.totals,served=R.filter(r=>r.decision!=='BLOCK'),blocked=R.filter(r=>r.decision==='BLOCK'),fo=R.filter(r=>kind(r)==='failover'),apps=Object.keys(D.apps);
+const actual=sum(R,r=>r.cost),base=sum(R,r=>r.base),reasons={};blocked.forEach(r=>reasons[r.reason]=(reasons[r.reason]||0)+1);
+const share=m=>served.filter(r=>!r.cache_hit&&short(r.model)===m).length;
+$('#when').textContent=new Date(D.meta.generated_at).toLocaleString([], {dateStyle:'medium',timeStyle:'short'});$('#cmd').textContent=D.meta.command;
+$('#story').innerHTML=[`<b>${served.length} of ${R.length} requests were served; ${blocked.length} were stopped</b> before any model was called, for ${Object.keys(reasons).length} different reasons (policy, security and budget).`,
+`<b>The gateway, not the caller, chose the model:</b> ${share('sol')} went to the premium model, ${share('terra')} to the mid-tier, ${share('luna')} to the low-cost one, and ${R.filter(r=>r.cache_hit).length} were answered from cache. Metered cost was <b>${$$(actual)}</b> against ${$$(base)} had everything used the premium model (${pc(1-actual/base)} lower, an illustration on scripted traffic).`,
+fo.length?`<b>A model outage caused no failed requests:</b> ${fo.length} requests failed over automatically, then the circuit breaker took the unhealthy model out of rotation.`:'No provider outage occurred in this run.',
+`<b>Every request left a record</b>, and the checks below recompute the totals from those records.`].map(x=>'<li>'+x+'</li>').join('');
+$('#kpi').innerHTML=[[R.length,'requests'],[served.length,'served'],[blocked.length,'blocked by the gateway'],[R.filter(r=>r.cache_hit).length,'answered from cache'],[fo.length,'automatic failovers'],[$$(actual),'metered cost (demo prices)']].map(([v,l])=>`<div class="card k" style="margin:0"><b>${v}</b><span>${l}</span></div>`).join('');
+const ch=[['Every request has a usage-ledger row and an audit record',R.every(r=>r.l.request_id&&r.a.request_id),`${R.length} requests · ${D.ledger.length} ledger rows · ${D.audit.length} audit events`],
+['Per-request costs add up to the gateway’s own control-tower total',eq(actual,T.cost_usd),`${$$(actual)} recomputed from rows · ${$$(T.cost_usd)} reported`],
+['Stopped requests cost nothing and never reached a model',blocked.every(r=>r.cost===0&&!r.model),`${blocked.length} blocked · total cost ${$$(sum(blocked,r=>r.cost))}`],
+['Each application’s spend matches its budget record',apps.every(a=>eq(sum(R.filter(r=>r.app===a),r=>r.cost),D.budgets[a].spent_today_usd)),apps.map(a=>`${a} ${$$(D.budgets[a].spent_today_usd)}`).join(' · ')],
+['No application went over its daily limit',apps.every(a=>D.budgets[a].spent_today_usd<=D.budgets[a].limit_usd+1e-9),'limits enforced by atomic budget reservations'],
+['Cache hits cost nothing',R.filter(r=>r.cache_hit).every(r=>r.cost===0),`${R.filter(r=>r.cache_hit).length} hits · ${T.tokens_avoided.toLocaleString()} tokens avoided`]];
+$('#proof').innerHTML=ch.map(([t,ok,d])=>`<div class="chk"><span class="mk ${ok?'pass':'fail'}">${ok?'✓':'✗'}</span><div>${t}<small>${esc(d)}</small></div></div>`).join('');
+// A: cumulative spend
+{let W=640,H=210,p=34,c=0,b=0,P=[],Q=[],mx=Math.max(base,actual)||1;R.forEach((r,i)=>{c+=r.cost;b+=r.base;const x=p+(W-p-8)*(i+1)/R.length;P.push([x,H-24-(H-44)*c/mx]);Q.push([x,H-24-(H-44)*b/mx])});
+const path=a=>'M'+a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join('L'),f0=R.findIndex(r=>kind(r)==='failover'),fx=f0<0?0:p+(W-p-8)*(f0+1)/R.length;
+$('#cA').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative spend"><path d="M${p},${H-24}H${W-8}" stroke="var(--line)"/><text x="${p}" y="14" fill="var(--dim)" font-size="11">${$$(mx)}</text><text x="${p}" y="${H-6}" fill="var(--dim)" font-size="11">request 1</text><text x="${W-8}" y="${H-6}" fill="var(--dim)" font-size="11" text-anchor="end">request ${R.length}</text><path d="${path(Q)}" fill="none" stroke="var(--cache)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(P)}" fill="none" stroke="var(--teal)" stroke-width="2.5"/>${f0<0?'':`<path d="M${fx},20V${H-24}" stroke="var(--amber)" stroke-dasharray="3 3"/><text x="${fx-4}" y="30" fill="var(--amber)" font-size="11" text-anchor="end">model outage</text>`}</svg>`}
+// B: where requests went
+{const mx=Math.max(...apps.map(a=>R.filter(r=>r.app===a).length)),used=new Set();$('#cB').innerHTML=apps.map(a=>{const rs=R.filter(r=>r.app===a),by={};rs.forEach(r=>{const s=seg(r);by[s]=(by[s]||0)+1;used.add(s)});
+return`<div class="row"><div class="t"><span>${a}</span><small class="n">${esc(D.apps[a].about)} · ${rs.length} requests</small></div><div class="bar" style="display:flex;width:${100*rs.length/mx}%;min-width:8%">${['sol','terra','luna','cache','blocked'].filter(s=>by[s]).map(s=>`<div title="${s}: ${by[s]}" style="width:${100*by[s]/rs.length}%;background:${col[s]}"></div>`).join('')}</div></div>`}).join('');
+$('#lgB').innerHTML=[['sol','Premium'],['terra','Mid-tier'],['luna','Low-cost'],['cache','Cache'],['blocked','Blocked']].filter(([s])=>used.has(s)).map(([s,n])=>`<span><i style="background:${col[s]}"></i>${n}</span>`).join('')}
+$('#bud').innerHTML=apps.map(a=>{const b=D.budgets[a],u=b.limit_usd?b.spent_today_usd/b.limit_usd:0,hit=R.some(r=>r.app===a&&r.reason==='BUDGET_EXCEEDED');return`<div class="row"><div class="t"><span>${a}</span><span>${$$(b.spent_today_usd)} of ${$$(b.limit_usd)}${hit?' · <b style="color:var(--coral)">limit enforced</b>':''}</span></div><div class="bar"><div style="width:${Math.min(100,u*100)}%;background:${hit||u>.9?'var(--coral)':u>.7?'var(--amber)':'var(--teal)'}"></div></div></div>`}).join('');
+const RL={APPLICATION_NOT_ALLOWED:'Unregistered application (“shadow AI”)',PROMPT_INJECTION_DETECTED:'Prompt injection attempt',SECRET_DETECTED:'Credential pasted into a prompt',PII_NOT_ALLOWED:'Personal data sent to an app not cleared for it',BUDGET_EXCEEDED:'Daily budget exhausted'};
+$('#blk').innerHTML=Object.entries(reasons).map(([k,v])=>`<div class="row"><div class="t"><span>${RL[k]||k}</span><b>${v}</b></div></div>`).join('')||'None';
+let flt='all',open=null;const FL=[['all','All'],['served','Served'],['cached','Cached'],['failover','Failover'],['blocked','Blocked']];
+const chip=r=>{const k=kind(r);return k==='blocked'?`<span class="ch" style="background:var(--blk)">blocked</span>`:`<span class="ch" style="background:${col[r.cache_hit?'cache':short(r.model)]}">${r.cache_hit?'cache':short(r.model)}</span>`+(k==='failover'?` <span class="ch" style="background:var(--amber)">failover</span>`:'')};
+const why=r=>r.decision==='BLOCK'?(RL[r.reason]||r.reason):kind(r)==='failover'?`${r.failed_over_from.map(short).join(', ')} unavailable, used ${short(r.model)}`:r.cache_hit?'identical question answered from cache':esc((r.route_reason||'').replace(/;/g,' · '));
+const inspect=r=>{const d=r.a.routing_decision||{},tc=d.task_classification||{};return`<tr class="ins"><td colspan="6"><b>${r.request_id}</b> · user ${esc(r.user)}<br>“${esc(r.prompt)}…”<br>Classified as <b>${tc.task_type||'n/a'}</b>, priority <b>${d.routing_priority||'n/a'}</b>, data class <b>${d.data_classification||'n/a'}</b>. Ranked: ${(d.ranked_alternatives||[]).map(x=>short(x.model)+' ('+x.score.toFixed(2)+')').join(' › ')||'none (stopped before routing)'}. Executed: <b>${short(d.final_executed_model)||'none'}</b>${(d.failed_models||[]).length?'; failed: '+d.failed_models.map(short).join(', '):''}${d.estimated_cost_usd!=null?'; reserved '+$$(d.estimated_cost_usd):''}.<details><summary>Raw audit record</summary><pre>${esc(JSON.stringify(r.a,null,1))}</pre></details></td></tr>`};
+function draw(){$('#fl').innerHTML=FL.map(([k,n])=>`<button class="${flt===k?'on':''}" data-f="${k}">${n} (${k==='all'?R.length:k==='served'?served.length:R.filter(r=>kind(r)===k).length})</button>`).join('');
+$('#tb').innerHTML=R.filter(r=>flt==='all'||(flt==='served'?r.decision!=='BLOCK':kind(r)===flt)).map(r=>`<tr class="r" data-i="${r.seq}"><td>${r.seq}</td><td>${r.app}</td><td>${chip(r)}</td><td>${why(r)}</td><td class="num">${$$(r.cost)}</td><td class="num">${r.tok||''}</td></tr>`+(open===r.seq?inspect(r):'')).join('')}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-f]'),t=e.target.closest('tr.r');if(b){flt=b.dataset.f;open=null;draw()}else if(t){open=open==+t.dataset.i?null:+t.dataset.i;draw()}});draw();
+$('#dl').onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(D,null,1)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='run-data.json';a.click()};
+</script></body></html>

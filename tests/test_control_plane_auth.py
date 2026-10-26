@@ -11,7 +11,7 @@ from app.main import app
 
 SECRET = "test-secret-with-enough-length-for-hs256"
 PROTECTED = ["/v1/config", "/v1/security/audit", "/v1/usage/recent",
-             "/v1/control-tower/overview", "/v1/evaluations/recent"]
+             "/v1/control-tower/overview", "/v1/control-tower/economics", "/v1/evaluations/recent"]
 client = TestClient(app)
 
 

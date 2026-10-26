@@ -22,9 +22,11 @@ class RedisRateLimiter:
         self.client = redis.from_url(url, decode_responses=True)
         self.limit, self.window = limit, window_seconds
     def allow(self, key: str) -> tuple[bool, int]:
+        # Fixed-window counter: set expiry only on the first increment. The Lua script
+        # makes increment + expiry atomic across gateway workers.
         bucket = f"gateway:ratelimit:{key}"
-        pipe = self.client.pipeline()
-        pipe.incr(bucket); pipe.expire(bucket, self.window); count, _ = pipe.execute()
+        script = "local n=redis.call('INCR', KEYS[1]); if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return n"
+        count = int(self.client.eval(script, 1, bucket, self.window))
         return count <= self.limit, max(0, self.limit - count)
 
 def build_rate_limiter(settings):

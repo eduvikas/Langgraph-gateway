@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gateway
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [gateway_private]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [gateway_private]
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://gateway:${POSTGRES_PASSWORD}@postgres:5432/gateway
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MEMORY_BACKEND: sql
+      RATE_LIMITER_BACKEND: redis
+      CACHE_BACKEND: redis
+      AUTH_ENABLED: "true"
+      MOCK_PROVIDER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    networks: [gateway_private]
+
+volumes:
+  postgres_data:
+  redis_data:
+networks:
+  gateway_private:
+    driver: bridge

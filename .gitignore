@@ -6,3 +6,7 @@ __pycache__/
 gateway.db
 *.sqlite
 *.sqlite3
+
+.env.*
+!.env.example
+!.env.production.example

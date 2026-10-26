@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enterprise AI Gateway - MCP demo replay</title>
+<style>
+body{margin:0;background:#0f1419;color:#d7dde4;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
+header{padding:14px 18px;border-bottom:1px solid #263040;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+h1{font-size:15px;margin:0 auto 0 0;font-weight:600}
+button,select{background:#1b2430;color:#d7dde4;border:1px solid #33425a;border-radius:6px;padding:6px 12px;font:inherit;cursor:pointer}
+button:hover{background:#243044}
+pre{margin:0;padding:18px;white-space:pre-wrap;word-break:break-word;min-height:70vh}
+.s{color:#6cb6ff;font-weight:600}.p{color:#7ee787}.b{color:#ff7b72}.d{color:#8b98a9}
+small{color:#8b98a9;padding:0 18px 18px;display:block}
+</style></head><body>
+<header><h1>Enterprise AI Gateway - MCP integration demo</h1>
+<button id="play">Restart</button><button id="pause">Pause</button>
+<label>Speed <select id="spd"><option>0.5</option><option selected>1</option><option>2</option><option>4</option></select></label></header>
+<pre id="t"></pre>
+<small>Replay of a real run of scripts/demo_mcp_walkthrough.py (stdio MCP server, mock provider, no spend). Dollar figures demonstrate mechanics only.</small>
+<script>
+const EV=[[0.378, "Enterprise AI Gateway  ·  MCP integration demo  (stdio, mock provider, no spend)\r\n"], [2.915, "\r\n"], [2.915, "━━━ Scene 1: Any MCP client can discover the governed tools ━━━━━━━━━━━━━━━━\r\n"], [3.619, "  • gateway_chat                   Execute a prompt through the governed gateway with routi…\r\n"], [3.769, "  • gateway_estimate_cost          Estimate input/output cost for an allowlisted model with…\r\n"], [3.919, "  • gateway_check_budget           Return budget status for an application the caller is au…\r\n"], [4.07, "  • gateway_get_routing_decision   Fetch one routing audit event. Operator/admin role requi…\r\n"], [4.22, "  • gateway_get_usage              Return recent usage rows for an application (maximum 100…\r\n"], [4.37, "  • gateway_health                 Check gateway readiness. Requires an authenticated MCP c…\r\n"], [4.521, "\r\n"], [4.521, "━━━ Scene 2: Pre-flight cost estimate (no model is called) ━━━━━━━━━━━━━━━━━\r\n"], [5.227, "  gpt-5.6-sol    ~11 in / 500 out tokens  ->  $0.010044\r\n"], [5.531, "  gpt-5.6-luna   ~11 in / 500 out tokens  ->  $0.000602\r\n"], [5.831, "\r\n"], [5.831, "━━━ Scene 3: Governed requests: the gateway, not the caller, picks the model ━━\r\n"], [6.532, "  (Mock mode exposes a single model, so the pick is trivial here; the routing reason shows what drove it.)\r\n"], [7.226, "  [simple   ] hint=general_fast/cost  ->  mock:mock-general   decision=ALLOW\r\n"], [7.526, "              reason: task=general_fast;priority=cost;client task hint; client priority hint\r\n"], [7.865, "  [coding   ] hint=coding/quality  ->  mock:mock-general   decision=ALLOW\r\n"], [8.165, "              reason: task=coding;priority=quality;client task hint; client priority hint\r\n"], [8.497, "  [reasoning] hint=reasoning/quality  ->  mock:mock-general   decision=ALLOW\r\n"], [8.798, "              reason: task=reasoning;priority=quality;client task hint; client priority hint\r\n"], [9.098, "\r\n"], [9.098, "━━━ Scene 4: Content security blocks unsafe prompts before any model call ━━\r\n"], [9.817, "  prompt injection  -> BLOCK  (PROMPT_INJECTION_DETECTED)   model called: no\r\n"], [10.234, "  secret in prompt  -> BLOCK  (SECRET_DETECTED)   model called: no\r\n"], [10.634, "\r\n"], [10.635, "━━━ Scene 5: Tenant isolation: another application cannot read this audit record ━━\r\n"], [11.342, "  owner (demo-app):       found=True\r\n"], [11.643, "  other (contract-agent): found=False\r\n"], [12.043, "\r\n"], [12.043, "━━━ Scene 6: Least privilege: a plain developer can use the gateway but not read audit or usage ━━\r\n"], [14.367, "  developer  gateway_check_budget          -> ok (limit $0.0009)\r\n"], [14.67, "  developer  gateway_get_routing_decision  -> denied (OPERATOR_ROLE_REQUIRED)\r\n"], [14.973, "  developer  gateway_get_usage             -> denied (OPERATOR_ROLE_REQUIRED)\r\n"], [15.608, "  operator   gateway_get_usage             -> ok (5 rows returned)\r\n"], [16.009, "\r\n"], [16.009, "━━━ Scene 7: Budget enforcement (daily limit for demo-app set to $0.0009 for the demo) ━━\r\n"], [16.709, "  Each request reserves a worst-case estimate up front, then settles to the actual cost.\r\n"], [17.339, "  request 1: ALLOW remaining=$0.000784\r\n"], [17.731, "  request 2: ALLOW remaining=$0.000751\r\n"], [18.118, "  request 3: ALLOW remaining=$0.000718\r\n"], [18.497, "  request 4: ALLOW remaining=$0.000686\r\n"], [18.879, "  request 5: ALLOW remaining=$0.000653\r\n"], [19.267, "  request 6: ALLOW remaining=$0.000621\r\n"], [19.653, "  request 7: ALLOW remaining=$0.000588\r\n"], [20.039, "  request 8: BLOCK remaining=$0.000588   reason=BUDGET_EXCEEDED  (provider never called)\r\n"], [20.395, "  budget status: spent=$0.000312 reserved=$0.000000 limit=$0.0009\r\n"], [20.795, "\r\n"], [20.795, "━━━ Scene 8: Usage ledger: everything above is metered and auditable ━━━━━━━\r\n"], [21.503, "  13 ledger rows  ->  ALLOW: 10, BLOCK: 3\r\n"], [21.903, "  total metered cost: $0.000312\r\n"], [22.819, "\r\n"], [22.819, "Done. Same tools, same controls, any MCP client.\r\n"]];
+const t=document.getElementById("t");let i=0,timer=null,paused=false,t0=0,base=0;
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function paint(line){let c="";if(line.startsWith("\u2501"))c="s";else if(/BLOCK/.test(line))c="b";else if(/ALLOW|found=True/.test(line))c="p";else if(/^\s*\(|reserves a/.test(line))c="d";
+ t.innerHTML+=(c?'<span class="'+c+'">'+esc(line)+'</span>':esc(line))}
+function step(){if(paused)return;const sp=parseFloat(document.getElementById("spd").value);
+ if(i>=EV.length)return;const wait=Math.max(0,(EV[i][0]-base)/sp);
+ timer=setTimeout(()=>{paint(EV[i][1].replace(/\r/g,""));i++;window.scrollTo(0,document.body.scrollHeight);step()},wait);
+ base=EV[i][0]}
+function start(){clearTimeout(timer);t.innerHTML="";i=0;base=0;paused=false;document.getElementById("pause").textContent="Pause";step()}
+document.getElementById("play").onclick=start;
+document.getElementById("pause").onclick=e=>{paused=!paused;e.target.textContent=paused?"Resume":"Pause";if(!paused)step();else clearTimeout(timer)};
+start();
+</script></body></html>

@@ -17,7 +17,8 @@
       "max_data_classification": "confidential",
       "allow_pii": true,
       "allow_secrets": false,
-      "allow_prompt_injection": false
+      "allow_prompt_injection": false,
+      "daily_budget_usd": 5.0
     },
     "contract-agent": {
       "enabled": true,
@@ -36,7 +37,8 @@
       "max_data_classification": "confidential",
       "allow_pii": true,
       "allow_secrets": false,
-      "allow_prompt_injection": false
+      "allow_prompt_injection": false,
+      "daily_budget_usd": 10.0
     },
     "sre-agent": {
       "enabled": true,
@@ -55,7 +57,9 @@
       "max_data_classification": "restricted",
       "allow_pii": false,
       "allow_secrets": false,
-      "allow_prompt_injection": false
+      "allow_prompt_injection": false,
+      "daily_budget_usd": 10.0,
+      "allow_cache": false
     }
   }
 }

@@ -1,0 +1,54 @@
+Enterprise AI Gateway  ·  MCP integration demo  (stdio, mock provider, no spend)
+
+━━━ Scene 1: Any MCP client can discover the governed tools ━━━━━━━━━━━━━━━━
+  • gateway_chat                   Execute a prompt through the governed gateway with routi…
+  • gateway_estimate_cost          Estimate input/output cost for an allowlisted model with…
+  • gateway_check_budget           Return budget status for an application the caller is au…
+  • gateway_get_routing_decision   Fetch one routing audit event. Operator/admin role requi…
+  • gateway_get_usage              Return recent usage rows for an application (maximum 100…
+  • gateway_health                 Check gateway readiness. Requires an authenticated MCP c…
+
+━━━ Scene 2: Pre-flight cost estimate (no model is called) ━━━━━━━━━━━━━━━━━
+  gpt-5.6-sol    ~11 in / 500 out tokens  ->  $0.010044
+  gpt-5.6-luna   ~11 in / 500 out tokens  ->  $0.000602
+
+━━━ Scene 3: Governed requests: the gateway, not the caller, picks the model ━━
+  (Mock mode exposes a single model, so the pick is trivial here; the routing reason shows what drove it.)
+  [simple   ] hint=general_fast/cost  ->  mock:mock-general   decision=ALLOW
+              reason: task=general_fast;priority=cost;client task hint; client priority hint
+  [coding   ] hint=coding/quality  ->  mock:mock-general   decision=ALLOW
+              reason: task=coding;priority=quality;client task hint; client priority hint
+  [reasoning] hint=reasoning/quality  ->  mock:mock-general   decision=ALLOW
+              reason: task=reasoning;priority=quality;client task hint; client priority hint
+
+━━━ Scene 4: Content security blocks unsafe prompts before any model call ━━
+  prompt injection  -> BLOCK  (PROMPT_INJECTION_DETECTED)   model called: no
+  secret in prompt  -> BLOCK  (SECRET_DETECTED)   model called: no
+
+━━━ Scene 5: Tenant isolation: another application cannot read this audit record ━━
+  owner (demo-app):       found=True
+  other (contract-agent): found=False
+
+━━━ Scene 6: Least privilege: a plain developer can use the gateway but not read audit or usage ━━
+  developer  gateway_check_budget          -> ok (limit $0.0009)
+  developer  gateway_get_routing_decision  -> denied (OPERATOR_ROLE_REQUIRED)
+  developer  gateway_get_usage             -> denied (OPERATOR_ROLE_REQUIRED)
+  operator   gateway_get_usage             -> ok (5 rows returned)
+
+━━━ Scene 7: Budget enforcement (daily limit for demo-app set to $0.0009 for the demo) ━━
+  Each request reserves a worst-case estimate up front, then settles to the actual cost.
+  request 1: ALLOW remaining=$0.000784
+  request 2: ALLOW remaining=$0.000751
+  request 3: ALLOW remaining=$0.000718
+  request 4: ALLOW remaining=$0.000686
+  request 5: ALLOW remaining=$0.000653
+  request 6: ALLOW remaining=$0.000621
+  request 7: ALLOW remaining=$0.000588
+  request 8: BLOCK remaining=$0.000588   reason=BUDGET_EXCEEDED  (provider never called)
+  budget status: spent=$0.000312 reserved=$0.000000 limit=$0.0009
+
+━━━ Scene 8: Usage ledger: everything above is metered and auditable ━━━━━━━
+  13 ledger rows  ->  ALLOW: 10, BLOCK: 3
+  total metered cost: $0.000312
+
+Done. Same tools, same controls, any MCP client.

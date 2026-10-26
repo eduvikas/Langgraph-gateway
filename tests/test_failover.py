@@ -70,3 +70,14 @@ def test_failover_never_uses_a_model_the_app_is_not_allowed(monkeypatch, tmp_pat
     graph = make_graph(monkeypatch, failing={"gpt-5.6-luna"}, policy_file=str(policy))
     with pytest.raises(RuntimeError, match="ALL_MODELS_FAILED"):
         graph.invoke(request())          # must NOT quietly fall over to terra or sol
+
+
+def test_request_routing_hint_is_used_for_selection(monkeypatch):
+    graph = make_graph(monkeypatch, failing=set())
+    req = request("Debug this Python function and explain the stack trace")
+    req["routing_metadata"] = {"task_type": "coding", "priority": "quality"}
+    result = graph.invoke(req)
+    assert result["task_type"] == "coding"
+    assert result["routing_priority"] == "quality"
+    assert result["response"] == f"answered by {result['selected_model']}"
+    assert result["selected_model"] in {"gpt-5.6-sol", "gpt-5.6-terra"}

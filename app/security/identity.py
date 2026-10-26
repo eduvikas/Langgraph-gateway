@@ -26,7 +26,8 @@ class IdentityProvider:
             raise IdentityError("AUTHENTICATION_REQUIRED")
         token = authorization.split(" ", 1)[1].strip()
         try:
-            claims = jwt.decode(token, self.settings.jwt_secret, algorithms=[self.settings.jwt_algorithm], audience=self.settings.jwt_audience, issuer=self.settings.jwt_issuer, options={"verify_aud": bool(self.settings.jwt_audience), "verify_iss": bool(self.settings.jwt_issuer)})
+            required_claims = ["exp", "iat"] if self.settings.app_env.lower() in {"prod", "production"} else []
+            claims = jwt.decode(token, self.settings.jwt_secret, algorithms=[self.settings.jwt_algorithm], audience=self.settings.jwt_audience, issuer=self.settings.jwt_issuer, options={"verify_aud": bool(self.settings.jwt_audience), "verify_iss": bool(self.settings.jwt_issuer), "require": required_claims})
         except jwt.PyJWTError as exc:
             raise IdentityError("INVALID_TOKEN") from exc
         user_id = str(claims.get("sub") or "")
@@ -34,15 +35,12 @@ class IdentityProvider:
             raise IdentityError("TOKEN_SUBJECT_REQUIRED")
         roles = self._as_set(claims.get("roles") or claims.get("role") or "viewer")
         applications = self._as_set(claims.get("applications") or claims.get("apps") or "")
+        if application_id is not None and self.settings.app_env.lower() in {"prod", "production"} and not applications:
+            raise IdentityError("APPLICATIONS_CLAIM_REQUIRED")
         if application_id is not None and applications and application_id not in applications and "*" not in applications:
             raise IdentityError("APPLICATION_NOT_ASSIGNED")
         if requested_user_id and requested_user_id != user_id:
             raise IdentityError("USER_ID_MISMATCH")
-        # Chat/application requests must be explicitly scoped in the token.
-        # Control-plane authentication passes application_id=None and is not
-        # subject to an application claim.
-        if application_id is not None and not applications:
-            raise IdentityError("APPLICATION_CLAIM_REQUIRED")
         return Identity(user_id, roles, applications, claims, True)
 
     @staticmethod
