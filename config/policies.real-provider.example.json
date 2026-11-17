@@ -1,0 +1,17 @@
+{
+  "applications": {
+    "demo-app": {
+      "enabled": true,
+      "allowed_models": ["gpt-6-luna","gpt-6.1-terra","gpt-6.1-sol"],
+      "max_requests_per_session": 50,
+      "max_prompt_chars": 4000,
+      "required_roles": ["developer", "operator"],
+      "max_data_classification": "internal",
+      "allow_pii": false,
+      "allow_secrets": false,
+      "allow_prompt_injection": false,
+      "daily_budget_usd": 0.5,
+      "allow_cache": true
+    }
+  }
+}

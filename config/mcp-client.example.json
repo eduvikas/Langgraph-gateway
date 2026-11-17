@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "enterprise-ai-gateway": {
+      "command": "C:\\path\\to\\repo\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "app.mcp_server"],
+      "cwd": "C:\\path\\to\\repo",
+      "env": {
+        "APP_ENV": "local",
+        "AUTH_ENABLED": "false",
+        "MCP_ALLOW_INSECURE_LOCAL": "true",
+        "MCP_DEV_USER_ID": "local-dev",
+        "MCP_DEV_ROLES": "developer,operator",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
