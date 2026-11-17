@@ -24,6 +24,7 @@ An AI gateway / LLM FinOps control plane: it centralizes model access, routing, 
 | [docs/PRESENTING.md](docs/PRESENTING.md) | A 10-minute talk track for the dashboard, claims you can and cannot make, likely questions |
 | [docs/OPENAI_SETUP.md](docs/OPENAI_SETUP.md) | OpenAI dashboard, screen by screen: project, key, hard spend limit, credits, error codes |
 | [docs/REAL_PROVIDER.md](docs/REAL_PROVIDER.md) | Moving from mock to real OpenAI models safely: spend limits, preflight, first call |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | A step-by-step acceptance test: can an existing application adopt the gateway, and what the evidence proves |
 | [docs/ENGINEERING.md](docs/ENGINEERING.md) | How routing, failover and budget checks work; validation checklist |
 | [docs/HARDENING.md](docs/HARDENING.md) | Production configuration, deployment, security limits |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | The single source of truth for test results and what is unverified |

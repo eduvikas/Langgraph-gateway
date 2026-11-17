@@ -10,7 +10,7 @@ Environment: Linux, Python 3.12 (the figures below were re-run on 3.12 only afte
 
 | Check | Command | Result |
 |---|---|---|
-| Full test suite | `python -m pytest -q` | 498 passed, 1 skipped, 17 xfailed |
+| Full test suite | `python -m pytest -q` | 502 passed, 1 skipped, 17 xfailed (with Node.js installed). Without Node.js the dashboard script syntax check skips too: 501 passed, 2 skipped, 17 xfailed. The one skip with Node is the billable live-provider test, which needs `RUN_LIVE_PROVIDER_TESTS=1`. |
 | Stable under reuse and reordering | same, repeated on a used database and with `pytest-randomly` (seeds 1 and 20260717) | same result each time |
 | Live MCP session over stdio (real client SDK) | `python scripts/mcp_smoke_test.py` | 27 of 27 checks passed |
 
@@ -20,6 +20,7 @@ Environment: Linux, Python 3.12 (the figures below were re-run on 3.12 only afte
 
 | Independence from a private `.env` | `tests/test_dotenv_isolation.py`; the full suite with a real-provider `.env` in the folder | all tests pass; before this was fixed, a real-provider `.env` made dozens of tests fail |
 | Independence from exported environment variables | `tests/test_environment_isolation.py`; the full suite with `ALLOWED_APPLICATIONS`, `MODEL_PROFILES_JSON`, `BASELINE_MODEL`, `DEFAULT_DAILY_BUDGET_USD` and `OPENAI_API_KEY` exported | all tests pass; before `tests/conftest.py` removed them, such variables failed the failover, economics and budget tests |
+| Acceptance for an existing application | `scripts/acceptance_check.py` against a running gateway (mock provider); `tests/test_acceptance_script.py` starts real servers | accepts a healthy gateway; refuses gateways with secret blocking, injection blocking or the cache switched off, and a stopped gateway; the budget stop (E1) passes only after real spending and fails when the limit is below one request. Procedure: `ACCEPTANCE.md` |
 | Failover accounting | `tests/test_failover_accounting.py` (reads the reservation tables, not just `status()`) | after a failover the answering model is the one settled and recorded; failed attempts leave no active reservation; unaffordable and unpriced candidates are skipped |
 | Capability routing and model-configuration consistency | `tests/test_request_classifier.py`, `tests/test_model_configuration.py` | `vision`, `embeddings` and `tool_calling` survive classification and constrain routing; policy/profile drift is reported, and refused at startup in production |
 
@@ -37,6 +38,7 @@ Regression guards were checked by temporarily reverting the fixes: removing the 
 
 - Capability routing against real multimodal or tool-calling models. Tests use synthetic profiles; whether a given real model actually supports a capability it is configured with is not checked.
 - The model-configuration check against a real production `.env` and policy file. It is tested on synthetic and shipped-default configurations only.
+- The acceptance procedure against a real provider and against your own application: only the mock provider and a stand-in application were run. Part 2 and Part 3 of `ACCEPTANCE.md` are yours to run.
 - Real OpenAI calls. The preflight and the one-call check are tested only against a simulated response; nothing here has contacted OpenAI. Follow [REAL_PROVIDER.md](REAL_PROVIDER.md) (the opt-in `RUN_LIVE_PROVIDER_TESTS=1 pytest -q tests/test_live_openai_smoke.py` also bills).
 - PostgreSQL and Redis integration; multi-worker concurrency and load.
 - Docker image build and the production Compose deployment.
