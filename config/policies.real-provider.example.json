@@ -2,7 +2,11 @@
   "applications": {
     "demo-app": {
       "enabled": true,
-      "allowed_models": ["gpt-6-luna"],
+      "allowed_models": [
+         "gpt-6-luna",
+         "gpt-6.1-terra",
+          "gpt-6.1-sol"
+        ],
       "max_requests_per_session": 50,
       "max_prompt_chars": 4000,
       "required_roles": ["developer", "operator"],
